@@ -30,6 +30,7 @@ export interface Range {
 
 export interface RenderSettings {
   readonly scale: number;
+  readonly fps: number;
 }
 
 export interface RenderOptions extends RenderSettings {

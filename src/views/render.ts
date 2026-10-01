@@ -1,7 +1,35 @@
 import m from "mithril";
-import { App, Recording, RenderOptions } from "../gifcap";
+import { App, Frame, Recording, RenderOptions } from "../gifcap";
 import Button from "../components/button";
 import View from "../components/view";
+import { CAPTURE_FPS } from "../settings";
+
+// indexes of the frames to keep in [start, end] so that at most `fps` frames are shown per second
+export function selectFrames(frames: Frame[], start: number, end: number, fps: number): number[] {
+  const result: number[] = [];
+
+  if (fps >= CAPTURE_FPS) {
+    for (let index = start; index <= end; index++) {
+      result.push(index);
+    }
+
+    return result;
+  }
+
+  const interval = 1000 / fps;
+  let lastSlot = -1;
+
+  for (let index = start; index <= end; index++) {
+    const slot = Math.floor((frames[index].timestamp - frames[start].timestamp) / interval);
+
+    if (slot > lastSlot) {
+      result.push(index);
+      lastSlot = slot;
+    }
+  }
+
+  return result;
+}
 
 interface RenderViewAttrs {
   readonly app: App;
@@ -53,14 +81,23 @@ export default class RenderView implements m.ClassComponent<RenderViewAttrs> {
     const scaledCtx = canvases[1].getContext("2d", { willReadFrequently: true }) as CanvasRenderingContext2D;
     scaledCtx.imageSmoothingQuality = "high";
 
-    const processFrame = (index: number) => {
-      if (index > this.renderOptions.trim.end) {
+    const frames = this.recording.frames;
+    const indexes = selectFrames(
+      frames,
+      this.renderOptions.trim.start,
+      this.renderOptions.trim.end,
+      this.renderOptions.fps
+    );
+    const endTimestamp = frames[this.renderOptions.trim.end].timestamp + this.app.frameLength;
+
+    const processFrame = (i: number) => {
+      if (i >= indexes.length) {
         this._onbeforeremove = () => gif.abort();
         gif.render();
         return;
       }
 
-      const frame = this.recording.frames[index];
+      const frame = frames[indexes[i]];
       let imageData = frame.imageData;
 
       // we always copy the imagedata, because the user might want to
@@ -91,15 +128,13 @@ export default class RenderView implements m.ClassComponent<RenderViewAttrs> {
         imageData = scaledCtx.getImageData(0, 0, this.width, this.height);
       }
 
-      const delay =
-        index < this.renderOptions.trim.end
-          ? this.recording.frames[index + 1].timestamp - frame.timestamp
-          : this.app.frameLength;
+      // each kept frame lasts until the next kept one; the last lasts until the end of the trim range
+      const delay = (i < indexes.length - 1 ? frames[indexes[i + 1]].timestamp : endTimestamp) - frame.timestamp;
       gif.addFrame(imageData, delay);
-      setTimeout(() => processFrame(index + 1), 0);
+      setTimeout(() => processFrame(i + 1), 0);
     };
 
-    processFrame(this.renderOptions.trim.start);
+    processFrame(0);
   }
 
   view() {

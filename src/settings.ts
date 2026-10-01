@@ -1,7 +1,11 @@
 import { RenderSettings } from "./gifcap";
 
+// frames are captured at this rate; output FPS can only go lower
+export const CAPTURE_FPS = 12;
+
 export const DEFAULT_RENDER_SETTINGS: RenderSettings = {
   scale: 1,
+  fps: CAPTURE_FPS,
 };
 
 export interface SettingOption {
@@ -27,8 +31,18 @@ export const SETTINGS: Setting[] = [
       { value: 0.33, label: "Size: 33%" },
     ],
   },
+  {
+    name: "fps",
+    title: "Frames per second",
+    options: [
+      { value: CAPTURE_FPS, label: `${CAPTURE_FPS} FPS` },
+      { value: 10, label: "10 FPS" },
+      { value: 8, label: "8 FPS" },
+      { value: 5, label: "5 FPS" },
+    ],
+  },
 ];
 
 export function renderSettingsFrom(options: RenderSettings | undefined): RenderSettings {
-  return options ? { scale: options.scale } : DEFAULT_RENDER_SETTINGS;
+  return options ? { scale: options.scale, fps: options.fps } : DEFAULT_RENDER_SETTINGS;
 }

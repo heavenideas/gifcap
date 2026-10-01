@@ -5,6 +5,7 @@ import PreviewView from "./views/preview";
 import RecordView from "./views/record";
 import RenderView from "./views/render";
 import StartView from "./views/start";
+import { CAPTURE_FPS } from "./settings";
 
 declare global {
   interface MediaDevices {
@@ -38,8 +39,6 @@ declare global {
   };
 }
 
-const FPS = 12;
-
 type State =
   | { name: "start" }
   | { name: "playing"; gif: Gif; recording: Recording; renderOptions: RenderOptions }
@@ -54,7 +53,7 @@ function assertState<T extends State["name"], E extends T>(actual: T, expected: 
 }
 
 class Main implements App {
-  readonly frameLength = Math.floor(1000 / FPS);
+  readonly frameLength = Math.floor(1000 / CAPTURE_FPS);
 
   private _state: State = { name: "start" };
 

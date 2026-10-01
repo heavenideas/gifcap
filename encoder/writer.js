@@ -6,6 +6,10 @@ let opts;
 const frames = [];
 let encoder;
 
+// GIF delays are in centiseconds; carry the rounding error so long GIFs don't drift
+let elapsedMs = 0;
+let writtenCs = 0;
+
 function process() {
   if (!encoder) {
     if (!initialized || !opts) {
@@ -13,6 +17,8 @@ function process() {
     }
 
     encoder = Module['_encoder_new'](opts.width, opts.height);
+    elapsedMs = 0;
+    writtenCs = 0;
   }
 
   let frame;
@@ -22,7 +28,11 @@ function process() {
     const input = new Uint8Array(HEAPU8.buffer, ptr, frame.paletteLength + imageLength);
     input.set(new Uint8Array(frame.buffer));
 
-    Module['_encoder_add_frame'](encoder, frame.top, frame.left, frame.width, frame.height, ptr, frame.delay / 10);
+    elapsedMs += frame.delay;
+    const delay = Math.round(elapsedMs / 10) - writtenCs;
+    writtenCs += delay;
+
+    Module['_encoder_add_frame'](encoder, frame.top, frame.left, frame.width, frame.height, ptr, delay);
     Module._free(ptr);
   }
 }

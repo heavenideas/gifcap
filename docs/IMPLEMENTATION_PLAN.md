@@ -184,25 +184,27 @@ applied to the cropped region before encoding.
 
 **Files:** `src/gifcap.d.ts`, `src/views/preview.ts`, `src/views/render.ts`, `encoder/writer.js`.
 
-- [ ] Add `readonly fps: number` to `RenderOptions`, initialised like `scale`.
-- [ ] Add the `<select>` next to Size.
-- [ ] In `render.ts`, select frames by timestamp: keep a frame when
+- [x] Add `readonly fps: number` to `RenderOptions`, initialised like `scale`.
+- [x] Add the `<select>` next to Size.
+- [x] In `render.ts`, select frames by timestamp: keep a frame when
       `frame.timestamp >= nextEmit`, then `nextEmit += 1000 / fps`. A kept frame's delay is the
-      timestamp gap to the **next kept** frame; the last kept frame gets `1000 / fps`. Skipped frames
-      are never passed to `addFrame`. At `fps === 12` behaviour must equal today's.
-- [ ] Fix delay rounding in `encoder/writer.js`: pass `Math.round(frame.delay / 10)` instead of
-      `frame.delay / 10` (currently truncated by the `int` parameter, causing slow drift). This is
-      JS only, so no WASM rebuild is needed.
-- [ ] Progress bar still reaches 100% (the encoder's `totalFrames` counts only frames actually
+      timestamp gap to the **next kept** frame; the last kept frame lasts until the end of the trim
+      range (preserves total duration). Skipped frames are never passed to `addFrame`. At
+      `fps === 12` behaviour must equal today's.
+- [x] Fix delay rounding in `encoder/writer.js`: `frame.delay / 10` is truncated by the `int`
+      parameter, so GIFs play ~4% fast. Round with the error carried across frames
+      (`Math.round(elapsedMs / 10) - writtenCs`) so long GIFs don't drift. This is JS only, so no
+      WASM rebuild is needed.
+- [x] Progress bar still reaches 100% (the encoder's `totalFrames` counts only frames actually
       added).
-- [ ] `npm run build` passes.
+- [x] `npm run build` passes.
 
 ### Acceptance checks
 
-- [ ] A 10 s recording rendered at 5 FPS still plays for ~10 s (not shorter or longer).
-- [ ] High-motion recording at 5 FPS is clearly smaller than at 12 FPS.
-- [ ] Trim boundaries are respected at every FPS.
-- [ ] Combined with M2 (e.g. 50% + 8 FPS) works.
+- [x] A 10 s recording rendered at 5 FPS still plays for ~10 s (not shorter or longer).
+- [x] High-motion recording at 5 FPS is clearly smaller than at 12 FPS.
+- [x] Trim boundaries are respected at every FPS.
+- [x] Combined with M2 (e.g. 50% + 8 FPS) works.
 
 ---
 
@@ -290,3 +292,4 @@ Append one line per work session: date, milestone, what was done, anything left 
 | 2026-10-01 | — | Plan created. Fork at upstream `97c7267`. |
 | 2026-10-01 | M1 | Implemented. Verified in headless Chromium with a synthetic canvas `captureStream` standing in for `getDisplayMedia`: MP4 (1280×720, 4.07 s duration), forced-WebM path (duration patched to 4.18 s instead of `Infinity`), track `ended` path (synthetic event), no-`MediaRecorder` fallback, Edit round-trip, Discard revokes the URL. Added `fix-webm-duration` dependency and `"moduleResolution": "node"` in `tsconfig.json` so TS can resolve it. **Needs human verification:** real screen capture in Chrome/Firefox/Safari, seeking in VLC, real "Stop sharing" bar, render time unchanged on a real recording. |
 | 2026-10-01 | M2 | Implemented. Headless, synthetic 1280×720 stream, 3 s: 100% → 1280×720 / 788 KB; 50% → 640×360 / 224 KB; 33% → 422×238 / 142 KB; crop + 75% and a 20×15 px crop at 33% (→ 7×5) work; setting survives Edit. Added `src/settings.ts` (setting definitions + defaults) and `RenderSettings` type for M3/M4 to extend. **Needs human verification:** 1920×1080 real recording at 50%, render speed-up, text legibility at 75%. |
+| 2026-10-01 | M3 | Implemented. Headless, 5 s synthetic recording: 12 FPS → 61 frames / 1015 KB, 10 → 50 / 893 KB, 8 → 40 / 745 KB, 5 → 25 / 554 KB; total GIF delay 4.99–5.11 s at every FPS (before the rounding fix a 4 s recording came out at 3.79 s). `selectFrames` unit-checked on jittered timestamps with a trim range: first kept = trim start, average gaps 83/102/127/204 ms. 50% + 8 FPS combined works and survives Edit. Capture rate moved to `CAPTURE_FPS` in `src/settings.ts`. |
