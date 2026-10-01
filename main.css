@@ -234,6 +234,18 @@ h1 {
   background-position: right 1rem center;
 }
 
+/* keep the trim bar usable: on narrower windows, render settings wrap to a second row */
+@media (max-width: 1300px) {
+  .actions {
+    flex-wrap: wrap;
+    row-gap: 1em;
+  }
+
+  .actions > .playbar {
+    flex: 1 1 calc(100% - 80px);
+  }
+}
+
 input[type="range"] {
   padding-left: 0 !important;
   padding-right: 0 !important;

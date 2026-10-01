@@ -44,7 +44,7 @@ function cropBuffer(_from, box, width) {
 class GifEncoder {
 
   constructor(opts) {
-    this.opts = opts;
+    this.opts = Object.assign({ colors: 256, loss: 20 }, opts);
     this.listeners = new Map();
 
     this.previousBuffer = undefined;
@@ -57,7 +57,7 @@ class GifEncoder {
     this.busyQuantizers = 0;
 
     this.writer = new Worker('/encoder/writer.js');
-    this.writer.postMessage(opts);
+    this.writer.postMessage(this.opts);
 
     const onMessage = msg => this._onWriterMessage(msg);
     this.writer.addEventListener('message', onMessage);
@@ -81,7 +81,7 @@ class GifEncoder {
     const buffer = imageData.data.buffer;
 
     if (!this.previousBuffer) {
-      this.frames.push({ buffer, top: 0, left: 0, width: this.opts.width, height: this.opts.height, paletteLength: undefined, delay, quantized: false });
+      this.frames.push({ buffer, top: 0, left: 0, width: this.opts.width, height: this.opts.height, colors: this.opts.colors, paletteLength: undefined, delay, quantized: false });
     } else {
       const box = computeDiff(buffer, this.previousBuffer, this.opts.width);
 
@@ -89,7 +89,7 @@ class GifEncoder {
         this.frames[this.frames.length - 1].delay += delay; // no changes, let's drop the frame
       } else {
         const crop = cropBuffer(buffer, box, this.opts.width);
-        this.frames.push({ buffer: crop, ...box, paletteLength: undefined, delay, quantized: false });
+        this.frames.push({ buffer: crop, ...box, colors: this.opts.colors, paletteLength: undefined, delay, quantized: false });
       }
     }
 

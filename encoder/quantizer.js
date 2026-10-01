@@ -22,7 +22,7 @@ function process(frame) {
       self.postMessage({ paletteLength, buffer }, { transfer: [buffer] });
     }, 'viii');
 
-    Module['_quantize_image'](frame.width, frame.height, ptr, cb);
+    Module['_quantize_image'](frame.width, frame.height, ptr, frame.colors, cb);
     Module._free(ptr);
   }
 }

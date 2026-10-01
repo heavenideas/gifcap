@@ -59,6 +59,8 @@ export default class RenderView implements m.ClassComponent<RenderViewAttrs> {
     const gif = new GifEncoder({
       width: this.width,
       height: this.height,
+      colors: this.renderOptions.colors,
+      loss: this.renderOptions.loss,
     });
 
     gif.on("progress", (progress) => {

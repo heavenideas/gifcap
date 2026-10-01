@@ -6,6 +6,8 @@ export const CAPTURE_FPS = 12;
 export const DEFAULT_RENDER_SETTINGS: RenderSettings = {
   scale: 1,
   fps: CAPTURE_FPS,
+  colors: 256,
+  loss: 20,
 };
 
 export interface SettingOption {
@@ -41,8 +43,29 @@ export const SETTINGS: Setting[] = [
       { value: 5, label: "5 FPS" },
     ],
   },
+  {
+    name: "colors",
+    title: "Maximum colors per frame",
+    options: [
+      { value: 256, label: "256 colors" },
+      { value: 128, label: "128 colors" },
+      { value: 64, label: "64 colors" },
+      { value: 32, label: "32 colors" },
+    ],
+  },
+  {
+    name: "loss",
+    title: "Lossy compression level: higher is smaller but noisier",
+    options: [
+      { value: 20, label: "Compression: Normal" },
+      { value: 60, label: "Compression: High" },
+      { value: 120, label: "Compression: Max" },
+    ],
+  },
 ];
 
 export function renderSettingsFrom(options: RenderSettings | undefined): RenderSettings {
-  return options ? { scale: options.scale, fps: options.fps } : DEFAULT_RENDER_SETTINGS;
+  return options
+    ? { scale: options.scale, fps: options.fps, colors: options.colors, loss: options.loss }
+    : DEFAULT_RENDER_SETTINGS;
 }

@@ -37,9 +37,10 @@ inline Gif_Colormap *create_colormap_from_palette(const liq_palette *palette)
 }
 
 EMSCRIPTEN_KEEPALIVE
-void quantize_image(int width, int height, void *rgba, void (*cb)(void *, int, void *))
+void quantize_image(int width, int height, void *rgba, int max_colors, void (*cb)(void *, int, void *))
 {
   liq_attr *attr = liq_attr_create();
+  liq_set_max_colors(attr, max_colors);
   liq_image *raw_image = liq_image_create_rgba(attr, rgba, width, height, 0);
   liq_result *res = liq_quantize_image(attr, raw_image);
   liq_attr_destroy(attr);
@@ -56,8 +57,11 @@ void quantize_image(int width, int height, void *rgba, void (*cb)(void *, int, v
 }
 
 EMSCRIPTEN_KEEPALIVE
-Encoder *encoder_new(int width, int height)
+Encoder *encoder_new(int width, int height, int loss)
 {
+  // each writer worker has its own module instance, so a global is fine
+  gif_write_info.loss = loss;
+
   Gif_Stream *stream = Gif_NewStream();
   stream->screen_width = width;
   stream->screen_height = height;

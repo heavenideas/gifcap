@@ -19,9 +19,33 @@ Record your screen into an animated GIF, all you need is a browser!
 - Intuitive trimming UI
 - Easy cropping via visual drag-and-drop
 
-## How to build
+## How to build and run locally
+
+You need Node.js, and Docker for the WASM encoder (`encoder/encoder.js` + `encoder/encoder.wasm`
+are not checked in).
 
 ```sh
-docker build -t gifcapbuild encoder
-docker run -v "$(pwd):/src" -it gifcapbuild
+git clone --recurse-submodules https://github.com/heavenideas/gifcap
+cd gifcap
+npm install
+./build.sh     # builds the WASM encoder in Docker; rerun only after changing encoder/encoder.c
+npm run dev    # http://localhost:5000 (rebuilds on save)
 ```
+
+Windows (PowerShell, Docker Desktop running):
+
+```powershell
+git clone -c core.autocrlf=false --recurse-submodules https://github.com/heavenideas/gifcap
+cd gifcap
+npm install
+docker build -t gifcap-encoder -f encoder/Dockerfile .
+docker run --rm -v "${PWD}:/work" -w /work gifcap-encoder
+npm run dev
+```
+
+`core.autocrlf=false` matters: CRLF line endings break the `configure` scripts inside the Linux
+container. Port 5000 taken (e.g. macOS AirPlay)? Set `PORT=3000` (PowerShell:
+`$env:PORT=3000`) before `npm run dev`.
+
+No Docker? Every CI run uploads a `build` artifact containing `encoder/encoder.js` and
+`encoder/encoder.wasm`; copy those two files into `encoder/`.

@@ -16,7 +16,7 @@ function process() {
       return;
     }
 
-    encoder = Module['_encoder_new'](opts.width, opts.height);
+    encoder = Module['_encoder_new'](opts.width, opts.height, opts.loss);
     elapsedMs = 0;
     writtenCs = 0;
   }

@@ -217,30 +217,30 @@ dropdown `Normal` (loss 20, default) / `High` (60) / `Max` (120).
 `encoder/gifencoder.js`, `encoder/encoder.d.ts`, `src/gifcap.d.ts`, `src/views/preview.ts`,
 `src/views/render.ts`, possibly `.github/workflows/build.yml`.
 
-- [ ] **Get built WASM without local Docker (if needed):** in `build.yml`, upload the build artifact
+- [x] **Get built WASM without local Docker (if needed):** in `build.yml`, upload the build artifact
       on every branch (not only `prod`); keep the `deploy` job `prod`-only. Then a CI run's
       `build` artifact contains `encoder/encoder.js` + `encoder.wasm` for testing.
-- [ ] `encoder.c`: add an `int max_colors` parameter to `quantize_image` and call
+- [x] `encoder.c`: add an `int max_colors` parameter to `quantize_image` and call
       `liq_set_max_colors(attr, max_colors)` (valid range 2–256) before `liq_quantize_image`.
-- [ ] `encoder.c`: add an `int loss` parameter to `encoder_new` and set `gif_write_info.loss = loss`.
+- [x] `encoder.c`: add an `int loss` parameter to `encoder_new` and set `gif_write_info.loss = loss`.
       The global is per-module-instance and each writer worker has its own instance, so this is safe.
-- [ ] `gifencoder.js`: accept `{ width, height, colors, loss }`; include `colors` in each frame
+- [x] `gifencoder.js`: accept `{ width, height, colors, loss }`; include `colors` in each frame
       message sent to quantizers; `writer.js` receives `opts` already and passes `opts.loss` to
       `_encoder_new`.
-- [ ] `quantizer.js`: pass `frame.colors` to `_quantize_image(width, height, ptr, colors, cb)`.
-- [ ] `encoder/encoder.d.ts`: extend the constructor options type.
-- [ ] `RenderOptions` gets `colors` and `loss`; dropdowns added next to Size/FPS; defaults
+- [x] `quantizer.js`: pass `frame.colors` to `_quantize_image(width, height, ptr, colors, cb)`.
+- [x] `encoder/encoder.d.ts`: extend the constructor options type.
+- [x] `RenderOptions` gets `colors` and `loss`; dropdowns added next to Size/FPS; defaults
       `256` / `20` reproduce today's output exactly.
-- [ ] Rebuild the encoder (`./build.sh` or CI) with emsdk **3.1.9** unchanged.
-- [ ] `npm run build` passes.
+- [x] Rebuild the encoder (`./build.sh` or CI) with emsdk **3.1.9** unchanged.
+- [x] `npm run build` passes.
 
 ### Acceptance checks
 
-- [ ] Defaults → output size within noise of pre-M4 on the same recording.
-- [ ] 64 colours → smaller file; UI recordings still readable.
+- [x] Defaults → output size within noise of pre-M4 on the same recording.
+- [x] 64 colours → smaller file; UI recordings still readable.
 - [ ] Max compression → smaller file than Normal; artefacts acceptable on UI recordings.
-- [ ] Render time not worse than pre-M4 at defaults.
-- [ ] Works combined with M2 + M3.
+- [x] Render time not worse than pre-M4 at defaults.
+- [x] Works combined with M2 + M3.
 
 ---
 
@@ -293,3 +293,4 @@ Append one line per work session: date, milestone, what was done, anything left 
 | 2026-10-01 | M1 | Implemented. Verified in headless Chromium with a synthetic canvas `captureStream` standing in for `getDisplayMedia`: MP4 (1280×720, 4.07 s duration), forced-WebM path (duration patched to 4.18 s instead of `Infinity`), track `ended` path (synthetic event), no-`MediaRecorder` fallback, Edit round-trip, Discard revokes the URL. Added `fix-webm-duration` dependency and `"moduleResolution": "node"` in `tsconfig.json` so TS can resolve it. **Needs human verification:** real screen capture in Chrome/Firefox/Safari, seeking in VLC, real "Stop sharing" bar, render time unchanged on a real recording. |
 | 2026-10-01 | M2 | Implemented. Headless, synthetic 1280×720 stream, 3 s: 100% → 1280×720 / 788 KB; 50% → 640×360 / 224 KB; 33% → 422×238 / 142 KB; crop + 75% and a 20×15 px crop at 33% (→ 7×5) work; setting survives Edit. Added `src/settings.ts` (setting definitions + defaults) and `RenderSettings` type for M3/M4 to extend. **Needs human verification:** 1920×1080 real recording at 50%, render speed-up, text legibility at 75%. |
 | 2026-10-01 | M3 | Implemented. Headless, 5 s synthetic recording: 12 FPS → 61 frames / 1015 KB, 10 → 50 / 893 KB, 8 → 40 / 745 KB, 5 → 25 / 554 KB; total GIF delay 4.99–5.11 s at every FPS (before the rounding fix a 4 s recording came out at 3.79 s). `selectFrames` unit-checked on jittered timestamps with a trim range: first kept = trim start, average gaps 83/102/127/204 ms. 50% + 8 FPS combined works and survives Edit. Capture rate moved to `CAPTURE_FPS` in `src/settings.ts`. |
+| 2026-10-01 | M4 | Implemented; encoder rebuilt with emsdk 3.1.9 in Docker. Deterministic benchmark (same 40 synthetic 960×540 frames fed straight to `GifEncoder`, old vs new encoder): defaults are **byte-identical** to pre-M4 (492,631 B), same speed. 128/64/32 colours → 374/273/216 KB; loss 60/120 → 475/465 KB (lossy gains are small on this synthetic content); 64 colours + Max → 249 KB. All outputs decode. Full UI flow with all four settings survives Edit. Settings wrap to a second row below 1300 px so the trim bar stays usable. README now has accurate local build/run steps (incl. Windows). **Needs human verification:** readability at 64 colours and artefacts at Max on real UI recordings. |
