@@ -261,6 +261,18 @@ input[type="range"] {
   display: none;
 }
 
+/* Start screen */
+
+.start-actions {
+  display: flex;
+  justify-content: center;
+}
+
+.hint {
+  font-size: 0.75em;
+  color: #9e9e9e;
+}
+
 /* Onboarding image */
 
 .onboarding-gif {

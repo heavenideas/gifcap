@@ -226,6 +226,31 @@ requests (analytics, fonts, icons).
 - [ ] Owner: import the repo in Vercel and confirm the production URL works (screen capture
       needs HTTPS, which Vercel provides).
 
+## M7: Open a local video or GIF
+
+**Goal:** Use the same editor (trim, crop, size, FPS, colours, compression) on a video or GIF
+from the user's machine, not only on screen recordings. Read locally; never uploaded.
+
+- [x] Start screen: "Open Video or GIF" button (also on mobile, where recording isn't available)
+      and drag-and-drop onto the page.
+- [x] `src/import.ts` turns the file into a normal `Recording` sampled at `CAPTURE_FPS`, so the
+      rest of the pipeline is unchanged:
+  - Video (anything the browser's `<video>` plays; unknown MIME types are tried as video): seek
+    through it and grab a frame every 1/12 s. Handles files that report no duration (e.g.
+    MediaRecorder WebM) by seeking to the end first.
+  - GIF: decoded with WebCodecs `ImageDecoder` (frames come out composited), then resampled to
+    12 FPS with repeated frames sharing one `ImageData`; GIF timing is kept (delays < 20 ms
+    count as 100 ms, like browsers). Transparent areas are flattened onto white (the encoder has
+    no transparency). Browsers without `ImageDecoder` get a clear message.
+  - Imports are scaled down to fit ~1.5 GB of raw frames so long or large files don't crash the
+    tab.
+- [x] Import screen with progress and Cancel; unreadable files show a message and return to start.
+- [x] Verified headless (files generated in-browser): MediaRecorder WebM without duration (3 s →
+      3000 ms, 36 frames), MP4 (3 s), GIF with 100/200/300/400/1000 ms delays (renders back to 5
+      frames, 2.00 s), drag-and-drop, non-media file (message), Cancel on a 20 s video, crop +
+      50% + 8 FPS + 64 colours on an import, screen recording unaffected.
+- [ ] Owner: try real files (phone videos, `.mov`, large GIFs) in Chrome on Windows.
+
 ## Non-goals (don't build unless a new milestone is added)
 
 - Audio capture.
@@ -252,3 +277,4 @@ Append one line per work session: date, milestone, what was done, anything left 
 | 2026-10-01 | M1 | WebM was entirely green on the owner's machine too. Feature removed at the owner's request; `record.ts`, `play.ts`, `package.json`, `tsconfig.json` are back to upstream. |
 | 2026-10-01 | M6 | Vercel setup added (`vercel.json`, `scripts/build-site.js`), GoatCounter removed. Verified by simulating the Vercel build on a fresh clone. |
 | 2026-10-01 | M5 | Icons bundled as inline SVG (no more icongr.am requests). Checked visually on start, recording, preview and finished screens plus footer; the only remaining third-party requests are the two Google Fonts stylesheets. Fonts and CSP still open. |
+| 2026-10-01 | M7 | Local video/GIF import added (see M7). Needs a real-file check on the owner's machine. |

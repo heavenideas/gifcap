@@ -1,5 +1,6 @@
 import m from "mithril";
 import { App, Gif, Recording, RenderOptions } from "./gifcap";
+import ImportView from "./views/import";
 import PlayView from "./views/play";
 import PreviewView from "./views/preview";
 import RecordView from "./views/record";
@@ -18,6 +19,7 @@ type State =
   | { name: "start" }
   | { name: "playing"; gif: Gif; recording: Recording; renderOptions: RenderOptions }
   | { name: "recording"; captureStream: MediaStream }
+  | { name: "importing"; file: File }
   | { name: "previewing"; recording: Recording; renderOptions?: RenderOptions }
   | { name: "rendering"; recording: Recording; renderOptions: RenderOptions };
 
@@ -96,6 +98,8 @@ class Main implements App {
         return m(PlayView, { app: this, gif: this.state.gif });
       case "recording":
         return m(RecordView, { app: this, captureStream: this.state.captureStream });
+      case "importing":
+        return m(ImportView, { app: this, file: this.state.file });
       case "previewing":
         return m(PreviewView, { app: this, recording: this.state.recording, renderOptions: this.state.renderOptions });
       case "rendering":
@@ -119,6 +123,22 @@ class Main implements App {
 
   stopRecording(recording: Recording) {
     this.state = { name: "previewing", recording };
+  }
+
+  openFile(file: File) {
+    assertState(this.state.name, "start");
+    this.state = { name: "importing", file };
+  }
+
+  finishImport(recording: Recording) {
+    assertState(this.state.name, "importing");
+    this.state = { name: "previewing", recording };
+  }
+
+  cancelImport() {
+    if (this.state.name === "importing") {
+      this.state = { name: "start" };
+    }
   }
 
   startRendering(renderOptions: RenderOptions) {

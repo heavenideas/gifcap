@@ -1,4 +1,5 @@
 // Icons bundled so the app makes no third-party requests; previously loaded from icongr.am.
+// To add one, copy the <path d="..."> values from the package SVG (octicons: build/svg/<name>-16.svg).
 // "octicons/trashcan" is Octicons' "trash" (renamed upstream).
 
 /*! "octicons/*" icons: GitHub Octicons v19.38.0 (https://github.com/primer/octicons)
@@ -28,6 +29,10 @@ const ICONS: Record<string, IconData> = {
   "octicons/download": {
     viewBox: "0 0 16 16",
     paths: ["M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z", "M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"],
+  },
+  "octicons/file-media": {
+    viewBox: "0 0 16 16",
+    paths: ["M16 13.25A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25V2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75ZM1.75 2.5a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h.94l.03-.03 6.077-6.078a1.75 1.75 0 0 1 2.412-.06L14.5 10.31V2.75a.25.25 0 0 0-.25-.25Zm12.5 11a.25.25 0 0 0 .25-.25v-.917l-4.298-3.889a.25.25 0 0 0-.344.009L4.81 13.5ZM7 6a2 2 0 1 1-3.999.001A2 2 0 0 1 7 6ZM5.5 6a.5.5 0 1 0-1 0 .5.5 0 0 0 1 0Z"],
   },
   "octicons/gear": {
     viewBox: "0 0 16 16",

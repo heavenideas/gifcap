@@ -44,6 +44,9 @@ export interface App {
   readonly frameLength: number;
   startRecording(): void;
   stopRecording(recording: Recording): void;
+  openFile(file: File): void;
+  finishImport(recording: Recording): void;
+  cancelImport(): void;
   startRendering(renderOptions: RenderOptions): void;
   finishRendering(gif: Gif): void;
   cancelRendering(): void;
