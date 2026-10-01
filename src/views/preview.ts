@@ -1,8 +1,9 @@
 import m from "mithril";
-import { App, Frame, Recording, Rect, Range, RenderOptions } from "../gifcap";
+import { App, Frame, Recording, Rect, Range, RenderOptions, RenderSettings } from "../gifcap";
 import Button from "../components/button";
 import View from "../components/view";
 import { videoDownloadName } from "../filename";
+import { renderSettingsFrom, SETTINGS } from "../settings";
 
 interface Viewport extends Rect {
   scale: number;
@@ -72,6 +73,7 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
   private playback: Playback;
   private trim: Range;
   private crop: Rect;
+  private settings: RenderSettings;
 
   private didDraw = false;
   private didResize = false;
@@ -98,6 +100,7 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
       width: this.recording.width,
       height: this.recording.height,
     };
+    this.settings = renderSettingsFrom(vnode.attrs.renderOptions);
   }
 
   private get isPlaying() {
@@ -187,6 +190,21 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
           ]
         ),
       ]),
+      ...SETTINGS.map((setting) =>
+        m(
+          "select.render-setting",
+          {
+            name: setting.name,
+            title: setting.title,
+            onchange: (e: Event) => {
+              this.settings = { ...this.settings, [setting.name]: Number((e.target as HTMLSelectElement).value) };
+            },
+          },
+          setting.options.map((option) =>
+            m("option", { value: option.value, selected: option.value === this.settings[setting.name] }, option.label)
+          )
+        )
+      ),
       m(Button, {
         label: "Render",
         icon: "gear",
@@ -495,6 +513,7 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
 
   private startRendering(): void {
     this.app.startRendering({
+      ...this.settings,
       trim: {
         start: getFrameIndex(this.recording.frames, this.trim.start),
         end: getFrameIndex(this.recording.frames, this.trim.end),

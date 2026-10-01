@@ -152,28 +152,28 @@ applied to the cropped region before encoding.
 
 **Files:** `src/gifcap.d.ts`, `src/views/preview.ts`, `src/views/render.ts`, `main.css`.
 
-- [ ] Add `readonly scale: number` to `RenderOptions`. `PreviewView` initialises it from
+- [x] Add `readonly scale: number` to `RenderOptions`. `PreviewView` initialises it from
       `vnode.attrs.renderOptions?.scale ?? 1` so it survives Edit → Render round-trips.
-- [ ] Add a compact `<select>` to the preview action bar, styled to match the existing buttons
+- [x] Add a compact `<select>` to the preview action bar, styled to match the existing buttons
       (chota CSS). Keep the bar usable at narrow widths.
-- [ ] In `render.ts`, output size is `outW = Math.max(1, Math.round(crop.width * scale))` (same for
+- [x] In `render.ts`, output size is `outW = Math.max(1, Math.round(crop.width * scale))` (same for
       height). Pass `outW/outH` to `new GifEncoder(...)`.
-- [ ] When `scale !== 1`, `putImageData` the full frame to the existing hidden canvas, then
+- [x] When `scale !== 1`, `putImageData` the full frame to the existing hidden canvas, then
       `drawImage(srcCanvas, crop.left, crop.top, crop.width, crop.height, 0, 0, outW, outH)` onto a
       second hidden canvas of size `outW×outH` with `imageSmoothingQuality = "high"`, and
       `getImageData` from it. (`putImageData` ignores transforms, so two canvases are needed.)
-- [ ] When `scale === 1`, keep the current code path untouched.
-- [ ] Scaling happens **before** `gif.addFrame`, so frame diffing and dedupe operate on scaled
+- [x] When `scale === 1`, keep the current code path untouched.
+- [x] Scaling happens **before** `gif.addFrame`, so frame diffing and dedupe operate on scaled
       frames.
-- [ ] `npm run build` passes.
+- [x] `npm run build` passes.
 
 ### Acceptance checks
 
 - [ ] 50% on a 1920×1080 crop → GIF is 960×540; file noticeably smaller; render noticeably faster.
-- [ ] 100% → identical dimensions and comparable size to before M2.
+- [x] 100% → identical dimensions and comparable size to before M2.
 - [ ] Text stays legible at 75% on a typical UI recording.
-- [ ] Setting persists across Render → Edit → Render.
-- [ ] Tiny crops (≈10 px) at 33% don't crash (minimum 1 px).
+- [x] Setting persists across Render → Edit → Render.
+- [x] Tiny crops (≈10 px) at 33% don't crash (minimum 1 px).
 
 ---
 
@@ -289,3 +289,4 @@ Append one line per work session: date, milestone, what was done, anything left 
 |---|---|---|
 | 2026-10-01 | — | Plan created. Fork at upstream `97c7267`. |
 | 2026-10-01 | M1 | Implemented. Verified in headless Chromium with a synthetic canvas `captureStream` standing in for `getDisplayMedia`: MP4 (1280×720, 4.07 s duration), forced-WebM path (duration patched to 4.18 s instead of `Infinity`), track `ended` path (synthetic event), no-`MediaRecorder` fallback, Edit round-trip, Discard revokes the URL. Added `fix-webm-duration` dependency and `"moduleResolution": "node"` in `tsconfig.json` so TS can resolve it. **Needs human verification:** real screen capture in Chrome/Firefox/Safari, seeking in VLC, real "Stop sharing" bar, render time unchanged on a real recording. |
+| 2026-10-01 | M2 | Implemented. Headless, synthetic 1280×720 stream, 3 s: 100% → 1280×720 / 788 KB; 50% → 640×360 / 224 KB; 33% → 422×238 / 142 KB; crop + 75% and a 20×15 px crop at 33% (→ 7×5) work; setting survives Edit. Added `src/settings.ts` (setting definitions + defaults) and `RenderSettings` type for M3/M4 to extend. **Needs human verification:** 1920×1080 real recording at 50%, render speed-up, text legibility at 75%. |

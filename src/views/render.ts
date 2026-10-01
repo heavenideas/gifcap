@@ -13,6 +13,8 @@ export default class RenderView implements m.ClassComponent<RenderViewAttrs> {
   private readonly app: App;
   private readonly recording: Recording;
   private readonly renderOptions: RenderOptions;
+  private readonly width: number;
+  private readonly height: number;
 
   private progress = 0;
   private _onbeforeremove: Function | undefined;
@@ -21,12 +23,14 @@ export default class RenderView implements m.ClassComponent<RenderViewAttrs> {
     this.app = vnode.attrs.app;
     this.recording = vnode.attrs.recording;
     this.renderOptions = vnode.attrs.renderOptions;
+    this.width = Math.max(1, Math.round(this.renderOptions.crop.width * this.renderOptions.scale));
+    this.height = Math.max(1, Math.round(this.renderOptions.crop.height * this.renderOptions.scale));
   }
 
   async oncreate(vnode: m.VnodeDOM<RenderViewAttrs, this>) {
     const gif = new GifEncoder({
-      width: this.renderOptions.crop.width,
-      height: this.renderOptions.crop.height,
+      width: this.width,
+      height: this.height,
     });
 
     gif.on("progress", (progress) => {
@@ -44,7 +48,10 @@ export default class RenderView implements m.ClassComponent<RenderViewAttrs> {
       this.app.finishRendering({ blob, url, duration, size: blob.size });
     });
 
-    const ctx = vnode.dom.getElementsByTagName("canvas")[0].getContext("2d", { willReadFrequently: true }) as CanvasRenderingContext2D;
+    const canvases = vnode.dom.getElementsByTagName("canvas");
+    const ctx = canvases[0].getContext("2d", { willReadFrequently: true }) as CanvasRenderingContext2D;
+    const scaledCtx = canvases[1].getContext("2d", { willReadFrequently: true }) as CanvasRenderingContext2D;
+    scaledCtx.imageSmoothingQuality = "high";
 
     const processFrame = (index: number) => {
       if (index > this.renderOptions.trim.end) {
@@ -60,12 +67,29 @@ export default class RenderView implements m.ClassComponent<RenderViewAttrs> {
       // go back to edit, and we can't afford to lose frames which
       // were moved to web workers
       ctx.putImageData(imageData, 0, 0);
-      imageData = ctx.getImageData(
-        this.renderOptions.crop.left,
-        this.renderOptions.crop.top,
-        this.renderOptions.crop.width,
-        this.renderOptions.crop.height
-      );
+
+      if (this.renderOptions.scale === 1) {
+        imageData = ctx.getImageData(
+          this.renderOptions.crop.left,
+          this.renderOptions.crop.top,
+          this.renderOptions.crop.width,
+          this.renderOptions.crop.height
+        );
+      } else {
+        // putImageData ignores transforms, so scale by drawing onto a second canvas
+        scaledCtx.drawImage(
+          canvases[0],
+          this.renderOptions.crop.left,
+          this.renderOptions.crop.top,
+          this.renderOptions.crop.width,
+          this.renderOptions.crop.height,
+          0,
+          0,
+          this.width,
+          this.height
+        );
+        imageData = scaledCtx.getImageData(0, 0, this.width, this.height);
+      }
 
       const delay =
         index < this.renderOptions.trim.end
@@ -98,6 +122,7 @@ export default class RenderView implements m.ClassComponent<RenderViewAttrs> {
           width: this.recording.width,
           height: this.recording.height
         }),
+        m("canvas.hidden", { width: this.width, height: this.height }),
       ]),
     ];
   }

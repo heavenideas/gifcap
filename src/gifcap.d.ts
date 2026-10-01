@@ -28,7 +28,11 @@ export interface Range {
   end: number;
 }
 
-export interface RenderOptions {
+export interface RenderSettings {
+  readonly scale: number;
+}
+
+export interface RenderOptions extends RenderSettings {
   readonly trim: Range;
   readonly crop: Rect;
 }
