@@ -72,77 +72,15 @@ npm run build        # typecheck + bundle (run before every commit)
 
 ---
 
-## M1: Download the original video (Option A: parallel `MediaRecorder`)
+## M1: Download the original video: **REMOVED**
 
-**Goal:** Record the capture stream with `MediaRecorder` alongside the existing frame capture,
-and offer a **"Download original video"** button. The video is the untouched original: full
-resolution, the stream's native frame rate, **not** trimmed or cropped. No audio.
-
-**Files:** `src/gifcap.d.ts`, `src/main.ts`, `src/views/record.ts`, `src/views/preview.ts`,
-`src/views/play.ts`, possibly `main.css`.
-
-### Tasks
-
-- [x] **Types.** In `src/gifcap.d.ts` add:
-      ```ts
-      export interface Video { readonly blob: Blob; readonly url: string; readonly mimeType: string; }
-      ```
-      and an optional `readonly video?: Video` on `Recording`. Optional because `MediaRecorder` may
-      be unavailable or fail. The GIF flow must keep working without it.
-- [x] **TS declarations.** Add minimal `MediaRecorder` / `BlobEvent` declarations to the
-      `declare global` block in `src/main.ts` (TS 4.3 lacks them): constructor
-      `(stream, { mimeType?, videoBitsPerSecond? })`, static `isTypeSupported`, `start(timeslice?)`,
-      `stop()`, `state`, `mimeType`, `ondataavailable`, `onstop`, `onerror`.
-- [x] **Pick the format at runtime.** Try in order, first supported wins:
-      `video/webm;codecs=vp9`, `video/webm;codecs=vp8`, `video/webm`, `video/mp4;codecs=avc1`,
-      `video/mp4`. (WebM first: Chrome's H.264 path can use the GPU encoder, which produced green,
-      torn frames on a Windows machine in testing. MP4 is for Safari, which can't record WebM.) If none is supported or `MediaRecorder` is undefined, record no video.
-      After start, trust `recorder.mimeType` (not the requested string) for the file type.
-- [x] **Record in parallel.** In `RecordView.oncreate`, create the recorder on `this.captureStream`
-      with `videoBitsPerSecond: 8_000_000` (keeps screen text crisp; browser defaults are too
-      low) and `start(1000)` so chunks are flushed every second. Collect `ondataavailable`
-      chunks (ignore empty ones).
-- [x] **Async stop.** `stopRecording()` must call `recorder.stop()` and wait for `onstop` (the final
-      `dataavailable` arrives after `stop()`), then build the `Blob` and call
-      `app.stopRecording({ width, height, frames, video })`. Add a re-entry guard so the Stop button
-      and the track `ended` event can't both complete a stop. Stop the ticker worker first so no
-      frames are added while waiting. If the recorder errored, carry on without `video`.
-- [x] **WebM duration fix.** WebM files from `MediaRecorder` lack a Duration header, so many players
-      show no length and can't seek. When the result is WebM, patch the duration (measured from
-      recording start to stop) before creating the Blob. Use the small, dependency-free
-      `fix-webm-duration` npm package (bundled by esbuild; runs fully locally) or an equivalent
-      vendored function. MP4 needs no fix.
-- [x] **Blob URL lifecycle.** Create the object URL once when the recording stops. Revoke it in
-      `App.discardGif()` when the user confirms. Edit/re-render must **not** revoke it.
-- [x] **UI: preview screen.** Add an icon-only secondary `Button` (title
-      `"Download original video"`) to the `PreviewView` action bar, rendered only when
-      `recording.video` exists. Uses `Button`'s `a: { href, download }`, like `play.ts`.
-- [x] **UI: finished screen.** Add a labelled secondary button `"Download video"` next to "Download"
-      in `PlayView`, same condition. This requires passing `recording` (or `recording.video`) into
-      `PlayView`; `main.ts` already holds `recording` in the `playing` state.
-- [x] **Filename.** Reuse the existing `Recording YYYY-MM-DD at HH.MM.SS` pattern from
-      `play.ts` (extract it to a small shared helper rather than copy it), with extension `.mp4` or
-      `.webm` from the actual MIME type.
-- [x] `npm run build` passes (typecheck + bundle).
-
-### Acceptance checks
-
-- [ ] Chrome: record ~10 s with motion → preview shows the video button → downloaded file plays in
-      the browser and in VLC, **has a correct duration and is seekable**, full resolution, smooth
-      motion (more than 12 FPS).
-- [ ] Firefox: same, as WebM, with working duration/seeking.
-- [ ] Safari (if available): same, as MP4.
-- [ ] Trim + crop in preview → video download is still the full original (expected behaviour).
-- [x] Render GIF → Edit → Render again → video button still works on both screens.
-- [x] Stop via the browser's own "Stop sharing" bar (track `ended` path) → video still complete.
-- [x] Discard → confirm → object URL revoked (Devtools: fetching the old `blob:` URL fails).
-- [x] With `MediaRecorder` forced unavailable (e.g. `delete window.MediaRecorder` in devtools before
-      recording), the app works exactly as before, with no video button and no errors.
-- [x] Devtools Network tab shows **no new requests** during record/stop/download (apart from the
-      button icon from icongr.am, like every other icon; icons are self-hosted in M5).
-- [ ] GIF rendering time and output are unchanged versus before M1 on a comparable recording.
-
----
+Implemented with a parallel `MediaRecorder` on the capture stream (see commits `e7bd186`,
+`a84fbe5`) and then removed at the owner's request. On the owner's Windows/Chrome machine the
+recorded video was corrupted: the MP4 (H.264) had green, torn frames at intervals in every
+player, and the VP9 WebM was entirely green. Both point at the machine's hardware video encoder,
+which couldn't be reproduced or verified from a sandbox. The GIF pipeline was never affected (it
+grabs frames via canvas, not the encoder). If this comes back, start with forcing
+`video/webm;codecs=vp8` (software-encoded in Chrome) and get it verified on that machine first.
 
 ## M2: Resize output
 
@@ -249,13 +187,14 @@ dropdown `Normal` (loss 20, default) / `High` (60) / `Max` (120).
 browser*. Today, recording data is never sent anywhere, but the page itself makes third-party
 requests (analytics, fonts, icons).
 
-- [ ] Remove GoatCounter analytics from `index.html` (`gc.zgo.at/count.js`).
+- [x] Remove GoatCounter analytics from `index.html` (`gc.zgo.at/count.js`). Done with M6: it
+      reported page views to upstream's `gifcap.goatcounter.com` account.
 - [ ] Self-host fonts: Baloo 2 (700) and Roboto into `media/fonts/` with `@font-face` in `main.css`;
       remove the Google Fonts `<link>`s. (Both are OFL/Apache licensed; keep license files.)
 - [ ] Self-host icons now loaded from `icongr.am` as SVGs under `media/icons/`, and update
       `src/components/button.ts`, `src/components/timer.ts`, `src/main.ts`, `src/views/play.ts`.
       In use today: octicons `play`, `gear`, `trashcan`, `square-fill`, `download`, `pencil`, `clock`,
-      `mark-github`, `heart`, plus whatever M1 adds (e.g. `device-camera-video`); material `play`,
+      `mark-github`, `heart`; material `play`,
       `pause`, `coffee`. Octicons are MIT and Material Icons Apache-2.0, so keep license notices.
       Note `Button` currently tints icons via a URL `color` param, so you need white and `#333333`
       variants (or CSS-based tinting).
@@ -273,9 +212,26 @@ requests (analytics, fonts, icons).
 
 ---
 
+## M6: Deploy to Vercel
+
+**Goal:** Import the repo into Vercel and have it build and serve with no manual settings.
+
+- [x] `vercel.json`: no framework preset, build command `npm run build && node
+      scripts/build-site.js`, output directory `site`.
+- [x] `scripts/build-site.js` copies only what the app serves (`index.html`, `main.css`,
+      `LICENSE`, `dist/*.js`, the encoder JS + WASM, `media/`) into `site/` (git-ignored), so
+      `node_modules`, `docs`, `encoder/vendor`, etc. are never published.
+- [x] Built encoder is committed (see Dev loop), so Vercel never needs Docker/emsdk.
+- [x] Removed upstream's GoatCounter analytics script.
+- [x] Fresh clone → `npm install` → build command → serve `site/` → full record/render flow
+      works in headless Chromium.
+- [ ] Owner: import the repo in Vercel and confirm the production URL works (screen capture
+      needs HTTPS, which Vercel provides).
+
 ## Non-goals (don't build unless a new milestone is added)
 
 - Audio capture.
+- Downloading the original video (tried in M1, removed; see above).
 - Exporting the trimmed/cropped clip as video (WebCodecs/ffmpeg.wasm).
 - FPS above 12 or changing capture-time resolution.
 - Named presets, remembered settings, live size estimates, side-by-side quality previews.
@@ -295,3 +251,5 @@ Append one line per work session: date, milestone, what was done, anything left 
 | 2026-10-01 | M4 | Implemented; encoder rebuilt with emsdk 3.1.9 in Docker. Deterministic benchmark (same 40 synthetic 960×540 frames fed straight to `GifEncoder`, old vs new encoder): defaults are **byte-identical** to pre-M4 (492,631 B), same speed. 128/64/32 colours → 374/273/216 KB; loss 60/120 → 475/465 KB (lossy gains are small on this synthetic content); 64 colours + Max → 249 KB. All outputs decode. Full UI flow with all four settings survives Edit. Settings wrap to a second row below 1300 px so the trim bar stays usable. README now has accurate local build/run steps (incl. Windows). **Needs human verification:** readability at 64 colours and artefacts at Max on real UI recordings. |
 | 2026-10-01 | — | Committed the built encoder (from `encoder.c` at `7df7582`) so local runs need no Docker; `build.sh` fixed for Git Bash. |
 | 2026-10-01 | M1 | Human test on Windows/Chrome: GIF sizes/compression and video download work, but the MP4 had green, torn frames at intervals in every player (likely Chrome's GPU H.264 encoder). Switched to prefer WebM (VP9 → VP8), MP4 only as Safari fallback. **Needs human verification** that the WebM is clean on that machine. |
+| 2026-10-01 | M1 | WebM was entirely green on the owner's machine too. Feature removed at the owner's request; `record.ts`, `play.ts`, `package.json`, `tsconfig.json` are back to upstream. |
+| 2026-10-01 | M6 | Vercel setup added (`vercel.json`, `scripts/build-site.js`), GoatCounter removed. Verified by simulating the Vercel build on a fresh clone. |

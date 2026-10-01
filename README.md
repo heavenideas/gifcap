@@ -34,6 +34,13 @@ npm run dev    # http://localhost:5000 (rebuilds on save)
 Port 5000 taken (e.g. macOS AirPlay)? Set `PORT=3000` (PowerShell: `$env:PORT=3000`) before
 `npm run dev`.
 
+### Deploying to Vercel
+
+Import the repository in Vercel and deploy; `vercel.json` sets everything (no framework preset,
+build command `npm run build && node scripts/build-site.js`, output directory `site`). Only the
+files the app serves are published. To check the output locally:
+`npm run build && node scripts/build-site.js && npx serve site`.
+
 ### Rebuilding the encoder (only after changing `encoder/encoder.c`)
 
 Needs Docker. Uses `emscripten/emsdk:3.1.9`; don't bump it, upstream reverted an emsdk upgrade.
