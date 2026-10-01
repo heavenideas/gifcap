@@ -45,13 +45,11 @@ npm run dev          # typecheck --watch + esbuild --watch + static server
 npm run build        # typecheck + bundle (run before every commit)
 ```
 
-- **The WASM encoder is not in git.** Rendering a GIF needs `encoder/encoder.js` and
-  `encoder/encoder.wasm`. Either:
-  - build it with `./build.sh` (needs Docker; uses `emscripten/emsdk:3.1.9`, **do not bump**,
-    upstream's last commit reverted an emsdk upgrade), or
-  - for milestones that don't touch `encoder.c` (M1–M3), copy the two files from the live site
-    for local testing only: `curl -O https://gifcap.dev/encoder/encoder.js` and
-    `curl -O https://gifcap.dev/encoder/encoder.wasm` into `encoder/`. Never commit them.
+- **The built WASM encoder is checked in** (`encoder/encoder.js` + `encoder/encoder.wasm`, ~100 KB;
+  upstream git-ignores them, this fork commits them so running locally needs no Docker). After
+  changing `encoder/encoder.c`, rebuild with `./build.sh` (needs Docker; uses
+  `emscripten/emsdk:3.1.9`, **do not bump**, upstream's last commit reverted an emsdk upgrade) and
+  commit the regenerated files with the C change.
 - **TypeScript is 4.3**, whose `lib.dom` has **no `MediaRecorder` / `BlobEvent` types**. Declare
   the minimal surface you use in the existing `declare global` block in `src/main.ts` (same
   pattern as `getDisplayMedia`). Don't upgrade TypeScript as part of a feature milestone.
@@ -294,3 +292,4 @@ Append one line per work session: date, milestone, what was done, anything left 
 | 2026-10-01 | M2 | Implemented. Headless, synthetic 1280×720 stream, 3 s: 100% → 1280×720 / 788 KB; 50% → 640×360 / 224 KB; 33% → 422×238 / 142 KB; crop + 75% and a 20×15 px crop at 33% (→ 7×5) work; setting survives Edit. Added `src/settings.ts` (setting definitions + defaults) and `RenderSettings` type for M3/M4 to extend. **Needs human verification:** 1920×1080 real recording at 50%, render speed-up, text legibility at 75%. |
 | 2026-10-01 | M3 | Implemented. Headless, 5 s synthetic recording: 12 FPS → 61 frames / 1015 KB, 10 → 50 / 893 KB, 8 → 40 / 745 KB, 5 → 25 / 554 KB; total GIF delay 4.99–5.11 s at every FPS (before the rounding fix a 4 s recording came out at 3.79 s). `selectFrames` unit-checked on jittered timestamps with a trim range: first kept = trim start, average gaps 83/102/127/204 ms. 50% + 8 FPS combined works and survives Edit. Capture rate moved to `CAPTURE_FPS` in `src/settings.ts`. |
 | 2026-10-01 | M4 | Implemented; encoder rebuilt with emsdk 3.1.9 in Docker. Deterministic benchmark (same 40 synthetic 960×540 frames fed straight to `GifEncoder`, old vs new encoder): defaults are **byte-identical** to pre-M4 (492,631 B), same speed. 128/64/32 colours → 374/273/216 KB; loss 60/120 → 475/465 KB (lossy gains are small on this synthetic content); 64 colours + Max → 249 KB. All outputs decode. Full UI flow with all four settings survives Edit. Settings wrap to a second row below 1300 px so the trim bar stays usable. README now has accurate local build/run steps (incl. Windows). **Needs human verification:** readability at 64 colours and artefacts at Max on real UI recordings. |
+| 2026-10-01 | — | Committed the built encoder (from `encoder.c` at `7df7582`) so local runs need no Docker; `build.sh` fixed for Git Bash. |

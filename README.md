@@ -21,33 +21,36 @@ Record your screen into an animated GIF, all you need is a browser!
 
 ## How to build and run locally
 
-You need Node.js, and Docker for the WASM encoder (`encoder/encoder.js` + `encoder/encoder.wasm`
-are not checked in).
+You only need Node.js. The built WASM encoder (`encoder/encoder.js` + `encoder/encoder.wasm`) is
+checked in, so no Docker is required to run the app:
 
 ```sh
-git clone --recurse-submodules https://github.com/heavenideas/gifcap
+git clone https://github.com/heavenideas/gifcap
 cd gifcap
 npm install
-./build.sh     # builds the WASM encoder in Docker; rerun only after changing encoder/encoder.c
 npm run dev    # http://localhost:5000 (rebuilds on save)
 ```
 
-Windows (Docker Desktop running): in **Git Bash**, use the same commands as above but clone with
-`git clone -c core.autocrlf=false --recurse-submodules ...`; `./build.sh` handles Git Bash's path
-rewriting. In **PowerShell** (not Git Bash, which turns `/work` into `C:/Program Files/Git/work`):
+Port 5000 taken (e.g. macOS AirPlay)? Set `PORT=3000` (PowerShell: `$env:PORT=3000`) before
+`npm run dev`.
 
-```powershell
-git clone -c core.autocrlf=false --recurse-submodules https://github.com/heavenideas/gifcap
-cd gifcap
-npm install
-docker build -t gifcap-encoder -f encoder/Dockerfile .
-docker run --rm -v "${PWD}:/work" -w /work gifcap-encoder
-npm run dev
+### Rebuilding the encoder (only after changing `encoder/encoder.c`)
+
+Needs Docker. Uses `emscripten/emsdk:3.1.9`; don't bump it, upstream reverted an emsdk upgrade.
+Commit the regenerated `encoder/encoder.js` and `encoder/encoder.wasm` along with your C change.
+
+```sh
+./build.sh     # bash, macOS, Linux, or Git Bash on Windows
 ```
 
-`core.autocrlf=false` matters: CRLF line endings break the `configure` scripts inside the Linux
-container. Port 5000 taken (e.g. macOS AirPlay)? Set `PORT=3000` (PowerShell:
-`$env:PORT=3000`) before `npm run dev`.
+PowerShell instead (not Git Bash, which turns `/work` into `C:/Program Files/Git/work`):
 
-No Docker? Every CI run uploads a `build` artifact containing `encoder/encoder.js` and
-`encoder/encoder.wasm`; copy those two files into `encoder/`.
+```powershell
+git submodule update --init --recursive
+docker build -t gifcap-encoder -f encoder/Dockerfile .
+docker run --rm -v "${PWD}:/work" -w /work gifcap-encoder
+```
+
+On Windows, clone with `git clone -c core.autocrlf=false ...` before building: CRLF line endings
+break the `configure` scripts inside the Linux container. No Docker? Every CI run uploads a
+`build` artifact containing freshly built `encoder/encoder.js` and `encoder/encoder.wasm`.
