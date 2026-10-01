@@ -5,13 +5,15 @@ import Button from "../components/button";
 import Timer from "../components/timer";
 import View from "../components/view";
 
-// first supported type wins; MP4 is preferred since WebM from MediaRecorder lacks duration metadata
+// first supported type wins. WebM comes first: Chrome's H.264 (MP4) recording can go through the
+// GPU encoder, which on some Windows drivers produces green, torn frames. MP4 remains for Safari,
+// which can't record WebM. WebM's missing duration is patched in stopVideoRecorder.
 const VIDEO_MIME_TYPES = [
-  "video/mp4;codecs=avc1",
-  "video/mp4",
   "video/webm;codecs=vp9",
   "video/webm;codecs=vp8",
   "video/webm",
+  "video/mp4;codecs=avc1",
+  "video/mp4",
 ];
 
 // browser defaults are too low to keep screen text crisp

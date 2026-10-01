@@ -94,8 +94,9 @@ resolution, the stream's native frame rate, **not** trimmed or cropped. No audio
       `(stream, { mimeType?, videoBitsPerSecond? })`, static `isTypeSupported`, `start(timeslice?)`,
       `stop()`, `state`, `mimeType`, `ondataavailable`, `onstop`, `onerror`.
 - [x] **Pick the format at runtime.** Try in order, first supported wins:
-      `video/mp4;codecs=avc1`, `video/mp4`, `video/webm;codecs=vp9`, `video/webm;codecs=vp8`,
-      `video/webm`. If none is supported or `MediaRecorder` is undefined, record no video.
+      `video/webm;codecs=vp9`, `video/webm;codecs=vp8`, `video/webm`, `video/mp4;codecs=avc1`,
+      `video/mp4`. (WebM first: Chrome's H.264 path can use the GPU encoder, which produced green,
+      torn frames on a Windows machine in testing. MP4 is for Safari, which can't record WebM.) If none is supported or `MediaRecorder` is undefined, record no video.
       After start, trust `recorder.mimeType` (not the requested string) for the file type.
 - [x] **Record in parallel.** In `RecordView.oncreate`, create the recorder on `this.captureStream`
       with `videoBitsPerSecond: 8_000_000` (keeps screen text crisp; browser defaults are too
@@ -293,3 +294,4 @@ Append one line per work session: date, milestone, what was done, anything left 
 | 2026-10-01 | M3 | Implemented. Headless, 5 s synthetic recording: 12 FPS → 61 frames / 1015 KB, 10 → 50 / 893 KB, 8 → 40 / 745 KB, 5 → 25 / 554 KB; total GIF delay 4.99–5.11 s at every FPS (before the rounding fix a 4 s recording came out at 3.79 s). `selectFrames` unit-checked on jittered timestamps with a trim range: first kept = trim start, average gaps 83/102/127/204 ms. 50% + 8 FPS combined works and survives Edit. Capture rate moved to `CAPTURE_FPS` in `src/settings.ts`. |
 | 2026-10-01 | M4 | Implemented; encoder rebuilt with emsdk 3.1.9 in Docker. Deterministic benchmark (same 40 synthetic 960×540 frames fed straight to `GifEncoder`, old vs new encoder): defaults are **byte-identical** to pre-M4 (492,631 B), same speed. 128/64/32 colours → 374/273/216 KB; loss 60/120 → 475/465 KB (lossy gains are small on this synthetic content); 64 colours + Max → 249 KB. All outputs decode. Full UI flow with all four settings survives Edit. Settings wrap to a second row below 1300 px so the trim bar stays usable. README now has accurate local build/run steps (incl. Windows). **Needs human verification:** readability at 64 colours and artefacts at Max on real UI recordings. |
 | 2026-10-01 | — | Committed the built encoder (from `encoder.c` at `7df7582`) so local runs need no Docker; `build.sh` fixed for Git Bash. |
+| 2026-10-01 | M1 | Human test on Windows/Chrome: GIF sizes/compression and video download work, but the MP4 had green, torn frames at intervals in every player (likely Chrome's GPU H.264 encoder). Switched to prefer WebM (VP9 → VP8), MP4 only as Safari fallback. **Needs human verification** that the WebM is clean on that machine. |
