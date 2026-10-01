@@ -5,6 +5,7 @@ import PreviewView from "./views/preview";
 import RecordView from "./views/record";
 import RenderView from "./views/render";
 import StartView from "./views/start";
+import Icon from "./components/icon";
 import { CAPTURE_FPS } from "./settings";
 
 declare global {
@@ -59,10 +60,7 @@ class Main implements App {
         m("footer", { id: "app-footer" }, [
           m("span.left", [
             m("a", { href: "https://github.com/joaomoreno/gifcap" }, [
-              m("img", {
-                alt: "GitHub",
-                src: "https://icongr.am/octicons/mark-github.svg?size=18&color=9e9e9e",
-              }),
+              m(Icon, { name: "octicons/mark-github", size: 18, color: "#9e9e9e" }),
               " joaomoreno/gifcap",
             ]),
           ]),
@@ -74,20 +72,14 @@ class Main implements App {
                 href: "https://github.com/sponsors/joaomoreno",
               },
               [
-                m("img", {
-                  alt: "GitHub",
-                  src: "https://icongr.am/material/coffee.svg?size=18&color=9e9e9e",
-                }),
+                m(Icon, { name: "material/coffee", size: 18, color: "#9e9e9e" }),
                 " Like the tool? Sponsor me!",
               ]
             ),
           ]),
           m("span.right", [
             "Made with ",
-            m("img", {
-              alt: "love",
-              src: "https://icongr.am/octicons/heart.svg?size=18&color=9e9e9e",
-            }),
+            m(Icon, { name: "octicons/heart", size: 18, color: "#9e9e9e", label: "love" }),
             " by ",
             m("a", { href: "https://github.com/joaomoreno" }, ["João Moreno"]),
           ]),

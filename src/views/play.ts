@@ -3,6 +3,7 @@ import { App, Gif } from "../gifcap";
 import Button from "../components/button";
 import Timer from "../components/timer";
 import View from "../components/view";
+import Icon from "../components/icon";
 
 function humanSize(size: number): string {
   if (size < 1024) {
@@ -86,9 +87,7 @@ export default class PlayView implements m.ClassComponent<PlayViewAttrs> {
                   target: "_blank",
                 },
                 [
-                  m("img", {
-                    src: "https://icongr.am/octicons/download.svg?size=16&color=333333",
-                  }),
+                  m(Icon, { name: "octicons/download", size: 16, color: "#333333" }),
                   humanSize(this.gif.size),
                 ]
               ),

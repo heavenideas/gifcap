@@ -191,13 +191,11 @@ requests (analytics, fonts, icons).
       reported page views to upstream's `gifcap.goatcounter.com` account.
 - [ ] Self-host fonts: Baloo 2 (700) and Roboto into `media/fonts/` with `@font-face` in `main.css`;
       remove the Google Fonts `<link>`s. (Both are OFL/Apache licensed; keep license files.)
-- [ ] Self-host icons now loaded from `icongr.am` as SVGs under `media/icons/`, and update
-      `src/components/button.ts`, `src/components/timer.ts`, `src/main.ts`, `src/views/play.ts`.
-      In use today: octicons `play`, `gear`, `trashcan`, `square-fill`, `download`, `pencil`, `clock`,
-      `mark-github`, `heart`; material `play`,
-      `pause`, `coffee`. Octicons are MIT and Material Icons Apache-2.0, so keep license notices.
-      Note `Button` currently tints icons via a URL `color` param, so you need white and `#333333`
-      variants (or CSS-based tinting).
+- [x] Self-host icons previously loaded from `icongr.am`. Done as inline SVG: path data for the
+      12 icons in use lives in `src/icons.ts` (Octicons v19.38.0, MIT; Material Design Icons
+      v7.4.47, Apache-2.0; license notice kept in the bundle via a `/*! */` comment), rendered by
+      `src/components/icon.ts` with an explicit `fill`, so there are no image requests at all.
+      Octicons renamed `trashcan` to `trash`; the old name is kept as an alias.
 - [ ] Add a Content-Security-Policy `<meta>` to `index.html`, roughly:
       `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self'`.
       Adjust only as needed for the app to work. Never add another origin.
@@ -253,3 +251,4 @@ Append one line per work session: date, milestone, what was done, anything left 
 | 2026-10-01 | M1 | Human test on Windows/Chrome: GIF sizes/compression and video download work, but the MP4 had green, torn frames at intervals in every player (likely Chrome's GPU H.264 encoder). Switched to prefer WebM (VP9 → VP8), MP4 only as Safari fallback. **Needs human verification** that the WebM is clean on that machine. |
 | 2026-10-01 | M1 | WebM was entirely green on the owner's machine too. Feature removed at the owner's request; `record.ts`, `play.ts`, `package.json`, `tsconfig.json` are back to upstream. |
 | 2026-10-01 | M6 | Vercel setup added (`vercel.json`, `scripts/build-site.js`), GoatCounter removed. Verified by simulating the Vercel build on a fresh clone. |
+| 2026-10-01 | M5 | Icons bundled as inline SVG (no more icongr.am requests). Checked visually on start, recording, preview and finished screens plus footer; the only remaining third-party requests are the two Google Fonts stylesheets. Fonts and CSP still open. |

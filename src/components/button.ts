@@ -1,4 +1,5 @@
 import m from "mithril";
+import Icon from "./icon";
 
 interface ButtonAttrs {
   readonly a?: any;
@@ -24,10 +25,10 @@ export default class Button implements m.ClassComponent<ButtonAttrs> {
           ...vnode.attrs.a,
         },
         [
-          m("img", {
-            src: `https://icongr.am/${vnode.attrs.iconset || "octicons"}/${vnode.attrs.icon}.svg?size=16&color=${
-              vnode.attrs.outline ? "333333" : "ffffff"
-            }`,
+          m(Icon, {
+            name: `${vnode.attrs.iconset || "octicons"}/${vnode.attrs.icon}`,
+            size: 16,
+            color: vnode.attrs.outline ? "#333333" : "#ffffff",
           }),
           vnode.attrs.label,
         ]
@@ -44,10 +45,10 @@ export default class Button implements m.ClassComponent<ButtonAttrs> {
           disabled: vnode.attrs.disabled,
         },
         [
-          m("img", {
-            src: `https://icongr.am/${vnode.attrs.iconset || "octicons"}/${vnode.attrs.icon}.svg?size=16&color=${
-              vnode.attrs.outline ? "333333" : "ffffff"
-            }`,
+          m(Icon, {
+            name: `${vnode.attrs.iconset || "octicons"}/${vnode.attrs.icon}`,
+            size: 16,
+            color: vnode.attrs.outline ? "#333333" : "#ffffff",
           }),
           vnode.attrs.label,
         ]

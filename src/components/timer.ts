@@ -1,4 +1,5 @@
 import m from "mithril";
+import Icon from "./icon";
 
 function timediff(millis: number): string {
   const abs = Math.floor(millis / 1000);
@@ -16,9 +17,7 @@ interface TimerAttrs {
 export default class Timer implements m.ClassComponent<TimerAttrs> {
   view(vnode: m.Vnode<TimerAttrs>) {
     return m("span.tag.is-small", [
-      m("img", {
-        src: "https://icongr.am/octicons/clock.svg?size=16&color=333333",
-      }),
+      m(Icon, { name: "octicons/clock", size: 16, color: "#333333" }),
       timediff(vnode.attrs.duration),
     ]);
   }
