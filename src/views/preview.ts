@@ -2,7 +2,6 @@ import m from "mithril";
 import { App, Frame, Recording, Rect, Range, RenderOptions, RenderSettings } from "../gifcap";
 import Button from "../components/button";
 import View from "../components/view";
-import { videoDownloadName } from "../filename";
 import { renderSettingsFrom, SETTINGS } from "../settings";
 
 interface Viewport extends Rect {
@@ -211,16 +210,6 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
         onclick: () => this.startRendering(),
         primary: true,
       }),
-      this.recording.video
-        ? m(Button, {
-            icon: "device-camera-video",
-            a: {
-              href: this.recording.video.url,
-              download: videoDownloadName(this.recording.video),
-              title: "Download original video",
-            },
-          })
-        : undefined,
       m(Button, {
         title: "Discard",
         icon: "trashcan",

@@ -1,9 +1,8 @@
 import m from "mithril";
-import { App, Gif, Video } from "../gifcap";
+import { App, Gif } from "../gifcap";
 import Button from "../components/button";
 import Timer from "../components/timer";
 import View from "../components/view";
-import { downloadName, videoDownloadName } from "../filename";
 
 function humanSize(size: number): string {
   if (size < 1024) {
@@ -17,22 +16,27 @@ function humanSize(size: number): string {
 interface PlayViewAttrs {
   readonly app: App;
   readonly gif: Gif;
-  readonly video?: Video;
+}
+
+function pad(value: number, digits: number): string {
+  return String(value).padStart(digits, "0");
 }
 
 export default class PlayView implements m.ClassComponent<PlayViewAttrs> {
   private readonly app: App;
   private readonly gif: Gif;
-  private readonly video?: Video;
 
   constructor(vnode: m.CVnode<PlayViewAttrs>) {
     this.app = vnode.attrs.app;
     this.gif = vnode.attrs.gif;
-    this.video = vnode.attrs.video;
   }
 
   view() {
-    const download = downloadName("gif");
+    const now = new Date();
+    const download = `Recording ${pad(now.getFullYear(), 4)}-${pad(now.getMonth() + 1, 2)}-${pad(
+      now.getDate(),
+      2
+    )} at ${pad(now.getHours(), 2)}.${pad(now.getMinutes(), 2)}.${pad(now.getSeconds(), 2)}.gif`;
 
     const actions = [
       m(Button, {
@@ -45,17 +49,6 @@ export default class PlayView implements m.ClassComponent<PlayViewAttrs> {
         },
         primary: true,
       }),
-      this.video
-        ? m(Button, {
-            label: "Download video",
-            icon: "device-camera-video",
-            a: {
-              href: this.video.url,
-              download: videoDownloadName(this.video),
-              target: "_blank",
-            },
-          })
-        : undefined,
       m(Button, {
         label: "Edit",
         icon: "pencil",

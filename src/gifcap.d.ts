@@ -3,17 +3,10 @@ export interface Frame {
   readonly timestamp: number;
 }
 
-export interface Video {
-  readonly blob: Blob;
-  readonly url: string;
-  readonly mimeType: string;
-}
-
 export interface Recording {
   readonly width: number;
   readonly height: number;
   readonly frames: Frame[];
-  readonly video?: Video;
 }
 
 export interface Rect {

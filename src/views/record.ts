@@ -1,97 +1,8 @@
 import m from "mithril";
-import fixWebmDuration from "fix-webm-duration";
-import { App, Frame, Video } from "../gifcap";
+import { App, Frame } from "../gifcap";
 import Button from "../components/button";
 import Timer from "../components/timer";
 import View from "../components/view";
-
-// first supported type wins. WebM comes first: Chrome's H.264 (MP4) recording can go through the
-// GPU encoder, which on some Windows drivers produces green, torn frames. MP4 remains for Safari,
-// which can't record WebM. WebM's missing duration is patched in stopVideoRecorder.
-const VIDEO_MIME_TYPES = [
-  "video/webm;codecs=vp9",
-  "video/webm;codecs=vp8",
-  "video/webm",
-  "video/mp4;codecs=avc1",
-  "video/mp4",
-];
-
-// browser defaults are too low to keep screen text crisp
-const VIDEO_BITS_PER_SECOND = 8_000_000;
-
-interface VideoRecorder {
-  readonly recorder: MediaRecorder;
-  readonly chunks: Blob[];
-  readonly startTime: number;
-  readonly stopped: Promise<{ failed: boolean; stopTime: number }>;
-}
-
-function startVideoRecorder(stream: MediaStream): VideoRecorder | undefined {
-  if (typeof MediaRecorder === "undefined") {
-    return undefined;
-  }
-
-  const mimeType = VIDEO_MIME_TYPES.find((type) => MediaRecorder.isTypeSupported(type));
-
-  if (!mimeType) {
-    return undefined;
-  }
-
-  try {
-    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: VIDEO_BITS_PER_SECOND });
-    const chunks: Blob[] = [];
-    let failed = false;
-
-    recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) {
-        chunks.push(e.data);
-      }
-    };
-    recorder.onerror = (e) => {
-      console.error(e);
-      failed = true;
-    };
-
-    // the recorder stops on its own when the capture track ends, so the
-    // promise must exist before anyone calls stop()
-    const stopped = new Promise<{ failed: boolean; stopTime: number }>(
-      (c) => (recorder.onstop = () => c({ failed, stopTime: Date.now() }))
-    );
-
-    recorder.start(1000);
-    return { recorder, chunks, startTime: Date.now(), stopped };
-  } catch (err) {
-    console.error(err);
-    return undefined;
-  }
-}
-
-async function stopVideoRecorder(videoRecorder: VideoRecorder): Promise<Video | undefined> {
-  const recorder = videoRecorder.recorder;
-
-  if (recorder.state !== "inactive") {
-    recorder.stop();
-  }
-
-  const result = await videoRecorder.stopped;
-
-  if (result.failed || videoRecorder.chunks.length === 0) {
-    return undefined;
-  }
-
-  const mimeType = recorder.mimeType;
-  let blob = new Blob(videoRecorder.chunks, { type: mimeType });
-
-  if (mimeType.startsWith("video/webm")) {
-    try {
-      blob = await fixWebmDuration(blob, result.stopTime - videoRecorder.startTime, { logger: false });
-    } catch (err) {
-      console.error(err); // still a playable file, just without duration
-    }
-  }
-
-  return { blob, url: URL.createObjectURL(blob), mimeType };
-}
 
 interface RecordViewAttrs {
   readonly app: App;
@@ -106,9 +17,6 @@ export default class RecordView implements m.ClassComponent<RecordViewAttrs> {
   private width: number = 0;
   private height: number = 0;
   private frames: Frame[] = [];
-  private videoRecorder: VideoRecorder | undefined;
-  private stopping = false;
-  private stopTicker: Function | undefined;
   private _onbeforeremove: Function | undefined;
 
   constructor(vnode: m.CVnode<RecordViewAttrs>) {
@@ -121,7 +29,6 @@ export default class RecordView implements m.ClassComponent<RecordViewAttrs> {
     const canvas: HTMLCanvasElement = vnode.dom.getElementsByTagName("canvas")[0];
 
     video.srcObject = this.captureStream;
-    this.videoRecorder = startVideoRecorder(this.captureStream);
 
     const ctx = canvas.getContext("2d", { willReadFrequently: true }) as CanvasRenderingContext2D;
 
@@ -154,8 +61,6 @@ export default class RecordView implements m.ClassComponent<RecordViewAttrs> {
       });
     };
 
-    this.stopTicker = () => worker.terminate();
-
     const redrawInterval = setInterval(() => m.redraw(), this.app.frameLength);
 
     const track = this.captureStream.getVideoTracks()[0];
@@ -187,7 +92,6 @@ export default class RecordView implements m.ClassComponent<RecordViewAttrs> {
         m(Button, {
           label: "Stop Recording",
           icon: "square-fill",
-          disabled: this.stopping,
           onclick: () => this.stopRecording(),
         }),
         m("canvas.hidden", { width: 640, height: 480 }),
@@ -196,21 +100,11 @@ export default class RecordView implements m.ClassComponent<RecordViewAttrs> {
     ];
   }
 
-  private async stopRecording(): Promise<void> {
-    if (this.stopping) {
-      return;
-    }
-
-    this.stopping = true;
-    this.stopTicker && this.stopTicker();
-
-    const video = this.videoRecorder && (await stopVideoRecorder(this.videoRecorder));
-
+  private stopRecording(): void {
     this.app.stopRecording({
       width: this.width,
       height: this.height,
       frames: this.frames,
-      video,
     });
   }
 }
