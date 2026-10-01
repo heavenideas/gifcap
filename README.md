@@ -32,7 +32,9 @@ npm install
 npm run dev    # http://localhost:5000 (rebuilds on save)
 ```
 
-Windows (PowerShell, Docker Desktop running):
+Windows (Docker Desktop running): in **Git Bash**, use the same commands as above but clone with
+`git clone -c core.autocrlf=false --recurse-submodules ...`; `./build.sh` handles Git Bash's path
+rewriting. In **PowerShell** (not Git Bash, which turns `/work` into `C:/Program Files/Git/work`):
 
 ```powershell
 git clone -c core.autocrlf=false --recurse-submodules https://github.com/heavenideas/gifcap
