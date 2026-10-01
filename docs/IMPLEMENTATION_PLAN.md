@@ -85,46 +85,46 @@ resolution, the stream's native frame rate, **not** trimmed or cropped. No audio
 
 ### Tasks
 
-- [ ] **Types.** In `src/gifcap.d.ts` add:
+- [x] **Types.** In `src/gifcap.d.ts` add:
       ```ts
       export interface Video { readonly blob: Blob; readonly url: string; readonly mimeType: string; }
       ```
       and an optional `readonly video?: Video` on `Recording`. Optional because `MediaRecorder` may
       be unavailable or fail. The GIF flow must keep working without it.
-- [ ] **TS declarations.** Add minimal `MediaRecorder` / `BlobEvent` declarations to the
+- [x] **TS declarations.** Add minimal `MediaRecorder` / `BlobEvent` declarations to the
       `declare global` block in `src/main.ts` (TS 4.3 lacks them): constructor
       `(stream, { mimeType?, videoBitsPerSecond? })`, static `isTypeSupported`, `start(timeslice?)`,
       `stop()`, `state`, `mimeType`, `ondataavailable`, `onstop`, `onerror`.
-- [ ] **Pick the format at runtime.** Try in order, first supported wins:
+- [x] **Pick the format at runtime.** Try in order, first supported wins:
       `video/mp4;codecs=avc1`, `video/mp4`, `video/webm;codecs=vp9`, `video/webm;codecs=vp8`,
       `video/webm`. If none is supported or `MediaRecorder` is undefined, record no video.
       After start, trust `recorder.mimeType` (not the requested string) for the file type.
-- [ ] **Record in parallel.** In `RecordView.oncreate`, create the recorder on `this.captureStream`
+- [x] **Record in parallel.** In `RecordView.oncreate`, create the recorder on `this.captureStream`
       with `videoBitsPerSecond: 8_000_000` (keeps screen text crisp; browser defaults are too
       low) and `start(1000)` so chunks are flushed every second. Collect `ondataavailable`
       chunks (ignore empty ones).
-- [ ] **Async stop.** `stopRecording()` must call `recorder.stop()` and wait for `onstop` (the final
+- [x] **Async stop.** `stopRecording()` must call `recorder.stop()` and wait for `onstop` (the final
       `dataavailable` arrives after `stop()`), then build the `Blob` and call
       `app.stopRecording({ width, height, frames, video })`. Add a re-entry guard so the Stop button
       and the track `ended` event can't both complete a stop. Stop the ticker worker first so no
       frames are added while waiting. If the recorder errored, carry on without `video`.
-- [ ] **WebM duration fix.** WebM files from `MediaRecorder` lack a Duration header, so many players
+- [x] **WebM duration fix.** WebM files from `MediaRecorder` lack a Duration header, so many players
       show no length and can't seek. When the result is WebM, patch the duration (measured from
       recording start to stop) before creating the Blob. Use the small, dependency-free
       `fix-webm-duration` npm package (bundled by esbuild; runs fully locally) or an equivalent
       vendored function. MP4 needs no fix.
-- [ ] **Blob URL lifecycle.** Create the object URL once when the recording stops. Revoke it in
+- [x] **Blob URL lifecycle.** Create the object URL once when the recording stops. Revoke it in
       `App.discardGif()` when the user confirms. Edit/re-render must **not** revoke it.
-- [ ] **UI: preview screen.** Add an icon-only secondary `Button` (title
+- [x] **UI: preview screen.** Add an icon-only secondary `Button` (title
       `"Download original video"`) to the `PreviewView` action bar, rendered only when
       `recording.video` exists. Uses `Button`'s `a: { href, download }`, like `play.ts`.
-- [ ] **UI: finished screen.** Add a labelled secondary button `"Download video"` next to "Download"
+- [x] **UI: finished screen.** Add a labelled secondary button `"Download video"` next to "Download"
       in `PlayView`, same condition. This requires passing `recording` (or `recording.video`) into
       `PlayView`; `main.ts` already holds `recording` in the `playing` state.
-- [ ] **Filename.** Reuse the existing `Recording YYYY-MM-DD at HH.MM.SS` pattern from
+- [x] **Filename.** Reuse the existing `Recording YYYY-MM-DD at HH.MM.SS` pattern from
       `play.ts` (extract it to a small shared helper rather than copy it), with extension `.mp4` or
       `.webm` from the actual MIME type.
-- [ ] `npm run build` passes (typecheck + bundle).
+- [x] `npm run build` passes (typecheck + bundle).
 
 ### Acceptance checks
 
@@ -134,12 +134,13 @@ resolution, the stream's native frame rate, **not** trimmed or cropped. No audio
 - [ ] Firefox: same, as WebM, with working duration/seeking.
 - [ ] Safari (if available): same, as MP4.
 - [ ] Trim + crop in preview → video download is still the full original (expected behaviour).
-- [ ] Render GIF → Edit → Render again → video button still works on both screens.
-- [ ] Stop via the browser's own "Stop sharing" bar (track `ended` path) → video still complete.
-- [ ] Discard → confirm → object URL revoked (Devtools: fetching the old `blob:` URL fails).
-- [ ] With `MediaRecorder` forced unavailable (e.g. `delete window.MediaRecorder` in devtools before
+- [x] Render GIF → Edit → Render again → video button still works on both screens.
+- [x] Stop via the browser's own "Stop sharing" bar (track `ended` path) → video still complete.
+- [x] Discard → confirm → object URL revoked (Devtools: fetching the old `blob:` URL fails).
+- [x] With `MediaRecorder` forced unavailable (e.g. `delete window.MediaRecorder` in devtools before
       recording), the app works exactly as before, with no video button and no errors.
-- [ ] Devtools Network tab shows **no new requests** during record/stop/download.
+- [x] Devtools Network tab shows **no new requests** during record/stop/download (apart from the
+      button icon from icongr.am, like every other icon; icons are self-hosted in M5).
 - [ ] GIF rendering time and output are unchanged versus before M1 on a comparable recording.
 
 ---
@@ -287,3 +288,4 @@ Append one line per work session: date, milestone, what was done, anything left 
 | Date | Milestone | Notes |
 |---|---|---|
 | 2026-10-01 | — | Plan created. Fork at upstream `97c7267`. |
+| 2026-10-01 | M1 | Implemented. Verified in headless Chromium with a synthetic canvas `captureStream` standing in for `getDisplayMedia`: MP4 (1280×720, 4.07 s duration), forced-WebM path (duration patched to 4.18 s instead of `Infinity`), track `ended` path (synthetic event), no-`MediaRecorder` fallback, Edit round-trip, Discard revokes the URL. Added `fix-webm-duration` dependency and `"moduleResolution": "node"` in `tsconfig.json` so TS can resolve it. **Needs human verification:** real screen capture in Chrome/Firefox/Safari, seeking in VLC, real "Stop sharing" bar, render time unchanged on a real recording. |

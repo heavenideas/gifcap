@@ -9,6 +9,7 @@
     "allowSyntheticDefaultImports": true,
     "strict": true,
     "target": "es6",
+    "moduleResolution": "node",
     "rootDir": "src",
     "noUnusedLocals": true,
     "skipLibCheck": true
