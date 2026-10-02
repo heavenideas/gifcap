@@ -38,6 +38,8 @@ export interface Gif {
   readonly url: string;
   readonly duration: number;
   readonly size: number;
+  readonly width: number;
+  readonly height: number;
 }
 
 export interface App {

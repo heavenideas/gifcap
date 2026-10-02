@@ -2,7 +2,11 @@ import m from "mithril";
 import { App, Frame, Recording, Rect, Range, RenderOptions, RenderSettings } from "../gifcap";
 import Button from "../components/button";
 import View from "../components/view";
-import { renderSettingsFrom, SETTINGS } from "../settings";
+import { MAX_SCALE_PERCENT, MIN_SCALE_PERCENT, outputSize, renderSettingsFrom, SETTINGS } from "../settings";
+
+function formatPercent(scale: number): string {
+  return String(Math.round(scale * 10000) / 100);
+}
 
 interface Viewport extends Rect {
   scale: number;
@@ -73,6 +77,7 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
   private trim: Range;
   private crop: Rect;
   private settings: RenderSettings;
+  private scaleText: string; // what's in the size box, which may be mid-edit or invalid
 
   private didDraw = false;
   private didResize = false;
@@ -100,6 +105,7 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
       height: this.recording.height,
     };
     this.settings = renderSettingsFrom(vnode.attrs.renderOptions);
+    this.scaleText = formatPercent(this.settings.scale);
   }
 
   private get isPlaying() {
@@ -189,6 +195,7 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
           ]
         ),
       ]),
+      this.sizeSetting(),
       ...SETTINGS.map((setting) =>
         m(
           "select.render-setting",
@@ -244,6 +251,45 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
         ]
       ),
     ];
+  }
+
+  private sizeSetting(): m.Children {
+    const size = outputSize(this.crop, this.settings.scale);
+
+    return m(
+      "label.render-setting.size-setting",
+      { title: "Output size as a percentage of the cropped area; keeps the aspect ratio" },
+      [
+        "Size",
+        m("input", {
+          type: "number",
+          name: "scale",
+          min: MIN_SCALE_PERCENT,
+          max: MAX_SCALE_PERCENT,
+          step: 1,
+          value: this.scaleText,
+          class: this.isScaleTextValid() ? "" : "invalid",
+          oninput: (e: InputEvent) => this.onScaleInput((e.target as HTMLInputElement).value),
+          onblur: () => (this.scaleText = formatPercent(this.settings.scale)),
+        }),
+        "%",
+        m("span.output-size", `${size.width} × ${size.height}`),
+      ]
+    );
+  }
+
+  private isScaleTextValid(): boolean {
+    const percent = Number(this.scaleText);
+    return this.scaleText.trim() !== "" && percent >= MIN_SCALE_PERCENT && percent <= MAX_SCALE_PERCENT;
+  }
+
+  // keeps the last valid size while the box is empty or out of range; blur restores it
+  private onScaleInput(text: string): void {
+    this.scaleText = text;
+
+    if (this.isScaleTextValid()) {
+      this.settings = { ...this.settings, scale: Number(text) / 100 };
+    }
   }
 
   onTrimMouseDown(handle: "start" | "end", event: MouseEvent) {

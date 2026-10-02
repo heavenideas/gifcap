@@ -2,7 +2,7 @@ import m from "mithril";
 import { App, Frame, Recording, RenderOptions } from "../gifcap";
 import Button from "../components/button";
 import View from "../components/view";
-import { CAPTURE_FPS } from "../settings";
+import { CAPTURE_FPS, outputSize } from "../settings";
 
 // indexes of the frames to keep in [start, end] so that at most `fps` frames are shown per second
 export function selectFrames(frames: Frame[], start: number, end: number, fps: number): number[] {
@@ -51,8 +51,9 @@ export default class RenderView implements m.ClassComponent<RenderViewAttrs> {
     this.app = vnode.attrs.app;
     this.recording = vnode.attrs.recording;
     this.renderOptions = vnode.attrs.renderOptions;
-    this.width = Math.max(1, Math.round(this.renderOptions.crop.width * this.renderOptions.scale));
-    this.height = Math.max(1, Math.round(this.renderOptions.crop.height * this.renderOptions.scale));
+    const size = outputSize(this.renderOptions.crop, this.renderOptions.scale);
+    this.width = size.width;
+    this.height = size.height;
   }
 
   async oncreate(vnode: m.VnodeDOM<RenderViewAttrs, this>) {
@@ -75,7 +76,7 @@ export default class RenderView implements m.ClassComponent<RenderViewAttrs> {
         this.recording.frames[this.renderOptions.trim.start].timestamp +
         this.app.frameLength;
 
-      this.app.finishRendering({ blob, url, duration, size: blob.size });
+      this.app.finishRendering({ blob, url, duration, size: blob.size, width: this.width, height: this.height });
     });
 
     const canvases = vnode.dom.getElementsByTagName("canvas");

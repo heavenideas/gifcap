@@ -78,6 +78,7 @@ export default class PlayView implements m.ClassComponent<PlayViewAttrs> {
           ),
           m("footer", [
             m(Timer, { duration: this.gif.duration }),
+            m("span.tag.is-small", { title: "GIF dimensions" }, `${this.gif.width} × ${this.gif.height}`),
             m("span.tag.is-small", [
               m(
                 "a.recording-detail",

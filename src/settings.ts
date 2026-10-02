@@ -1,4 +1,4 @@
-import { RenderSettings } from "./gifcap";
+import { Rect, RenderSettings } from "./gifcap";
 
 // frames are captured at this rate; output FPS can only go lower
 export const CAPTURE_FPS = 12;
@@ -21,18 +21,20 @@ export interface Setting {
   readonly options: SettingOption[];
 }
 
-// first option of each setting must match its default
+// output size is a free percentage of the crop (keeps the aspect ratio)
+export const MIN_SCALE_PERCENT = 1;
+export const MAX_SCALE_PERCENT = 100;
+
+// GIF dimensions for a crop at a scale; used by both the editor display and the renderer
+export function outputSize(crop: Rect, scale: number): { width: number; height: number } {
+  return {
+    width: Math.max(1, Math.round(crop.width * scale)),
+    height: Math.max(1, Math.round(crop.height * scale)),
+  };
+}
+
+// dropdown settings; first option of each must match its default
 export const SETTINGS: Setting[] = [
-  {
-    name: "scale",
-    title: "Output size",
-    options: [
-      { value: 1, label: "Size: 100%" },
-      { value: 0.75, label: "Size: 75%" },
-      { value: 0.5, label: "Size: 50%" },
-      { value: 0.33, label: "Size: 33%" },
-    ],
-  },
   {
     name: "fps",
     title: "Frames per second",

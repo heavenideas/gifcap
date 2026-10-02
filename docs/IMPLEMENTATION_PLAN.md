@@ -251,6 +251,19 @@ from the user's machine, not only on screen recordings. Read locally; never uplo
       50% + 8 FPS + 64 colours on an import, screen recording unaffected.
 - [x] Owner: tried real files locally (a `.mov` and a GIF); both work.
 
+## M8: Free size percentage + output dimensions
+
+- [x] F3: the Size dropdown is now a number box, 1–100 % of the crop (decimals allowed, aspect
+      ratio kept). Empty/out-of-range input is flagged and the last valid size is kept; leaving
+      the box restores it.
+- [x] F2: the editor shows the output dimensions next to the size box, updating live while
+      cropping or typing; the finished screen shows the GIF's dimensions next to its duration
+      and file size. Both use `outputSize()` in `src/settings.ts`, the same function the renderer
+      uses, so the number shown is the number rendered.
+- [x] Verified headless: dimensions track the crop drag; 0 / 150 / empty flagged; 12.5 % renders
+      exactly the displayed 70 × 38; finished screen shows `00:03 · 70 × 38 · 13 KB`; value
+      survives Edit; screen recording at 25 % → 320 × 180.
+
 ## Non-goals (don't build unless a new milestone is added)
 
 - Audio capture.
@@ -279,3 +292,4 @@ Append one line per work session: date, milestone, what was done, anything left 
 | 2026-10-01 | M5 | Icons bundled as inline SVG (no more icongr.am requests). Checked visually on start, recording, preview and finished screens plus footer; the only remaining third-party requests are the two Google Fonts stylesheets. Fonts and CSP still open. |
 | 2026-10-01 | M7 | Local video/GIF import added (see M7). Needs a real-file check on the owner's machine. |
 | 2026-10-02 | M7 | Owner verified locally with a real `.mov` and GIF. Merged to `main`. |
+| 2026-10-02 | M8 | Free size percentage (F3) and live output dimensions (F2). F1 (live file-size estimate) assessed, not built yet. |
