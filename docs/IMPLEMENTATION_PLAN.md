@@ -249,7 +249,7 @@ from the user's machine, not only on screen recordings. Read locally; never uplo
       3000 ms, 36 frames), MP4 (3 s), GIF with 100/200/300/400/1000 ms delays (renders back to 5
       frames, 2.00 s), drag-and-drop, non-media file (message), Cancel on a 20 s video, crop +
       50% + 8 FPS + 64 colours on an import, screen recording unaffected.
-- [ ] Owner: try real files (phone videos, `.mov`, large GIFs) in Chrome on Windows.
+- [x] Owner: tried real files locally (a `.mov` and a GIF); both work.
 
 ## Non-goals (don't build unless a new milestone is added)
 
@@ -278,3 +278,4 @@ Append one line per work session: date, milestone, what was done, anything left 
 | 2026-10-01 | M6 | Vercel setup added (`vercel.json`, `scripts/build-site.js`), GoatCounter removed. Verified by simulating the Vercel build on a fresh clone. |
 | 2026-10-01 | M5 | Icons bundled as inline SVG (no more icongr.am requests). Checked visually on start, recording, preview and finished screens plus footer; the only remaining third-party requests are the two Google Fonts stylesheets. Fonts and CSP still open. |
 | 2026-10-01 | M7 | Local video/GIF import added (see M7). Needs a real-file check on the owner's machine. |
+| 2026-10-02 | M7 | Owner verified locally with a real `.mov` and GIF. Merged to `main`. |
