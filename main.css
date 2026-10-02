@@ -266,6 +266,14 @@ h1 {
   margin-left: 0.3em;
 }
 
+.actions > .estimate {
+  align-self: center;
+  margin: 0 10px 0 0;
+  color: var(--color-grey);
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
 /* keep the trim bar usable: on narrower windows, render settings wrap to a second row */
 @media (max-width: 1300px) {
   .actions {

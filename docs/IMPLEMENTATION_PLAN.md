@@ -264,6 +264,29 @@ from the user's machine, not only on screen recordings. Read locally; never uplo
       exactly the displayed 70 × 38; finished screen shows `00:03 · 70 × 38 · 13 KB`; value
       survives Edit; screen recording at 25 % → 320 × 180.
 
+## M9: Live file-size estimate (F1)
+
+**Goal:** Show roughly how big the GIF will be, and how much the settings save, updating as the
+user changes size, FPS, colours, compression, crop or trim, without rendering.
+
+- [x] `src/estimate.ts`, driven by the editor ~0.5 s after the last change (any newer change
+      cancels a running estimate). Shown next to Render as `≈ 4.46 MB (−87%)`; the percentage is
+      the saving versus 100% / 12 FPS / 256 colours / Normal with the same crop and trim.
+- [x] Up to 48 output frames: encoded fully, so the size is exact (no `≈`).
+- [x] Longer clips: the real encoder runs on three 12-frame sample windows (one at the start for
+      the full first frame, two where the most change happens). A small GIF parser splits each
+      frame's bytes into a fixed part (palette, position, delay) and compressed pixels. Changed
+      areas across the whole clip are found by comparing frames on a 16 px tile grid (computed once
+      per recording, cached), mirroring the encoder's own frame diff inside the crop. Estimate =
+      header + first frame + fixed cost × changed frames + bytes per changed pixel × changed area.
+- [x] Renderer and estimator share `src/pipeline.ts` (frame selection, crop + scale), so the
+      sample frames are exactly what a render encodes; the refactor was checked byte-identical.
+- [x] Accuracy vs. real renders (headless; 15 s 1280×720 videos: scrolling text, mostly-static UI
+      with bursts, noisy video; 5 setting combinations, with and without crop): within ±5.4% in
+      all cases except a nearly static crop (+12–14%, ~1 KB on 11 KB). Short clips exact. No main
+      thread task over 50 ms during an estimate.
+- [ ] Owner: check the estimate against real renders on real recordings.
+
 ## Non-goals (don't build unless a new milestone is added)
 
 - Audio capture.
@@ -293,3 +316,4 @@ Append one line per work session: date, milestone, what was done, anything left 
 | 2026-10-01 | M7 | Local video/GIF import added (see M7). Needs a real-file check on the owner's machine. |
 | 2026-10-02 | M7 | Owner verified locally with a real `.mov` and GIF. Merged to `main`. |
 | 2026-10-02 | M8 | Free size percentage (F3) and live output dimensions (F2). F1 (live file-size estimate) assessed, not built yet. |
+| 2026-10-02 | M9 | Live file-size estimate (F1) built and measured (see M9). F2/F3 merged to `main`. Note: Vercel deploys from `heavenideas/heavengif`, a one-time copy of this repo, not from this repo. |

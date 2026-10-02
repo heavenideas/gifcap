@@ -1,35 +1,9 @@
 import m from "mithril";
-import { App, Frame, Recording, RenderOptions } from "../gifcap";
+import { App, Recording, RenderOptions } from "../gifcap";
 import Button from "../components/button";
 import View from "../components/view";
-import { CAPTURE_FPS, outputSize } from "../settings";
-
-// indexes of the frames to keep in [start, end] so that at most `fps` frames are shown per second
-export function selectFrames(frames: Frame[], start: number, end: number, fps: number): number[] {
-  const result: number[] = [];
-
-  if (fps >= CAPTURE_FPS) {
-    for (let index = start; index <= end; index++) {
-      result.push(index);
-    }
-
-    return result;
-  }
-
-  const interval = 1000 / fps;
-  let lastSlot = -1;
-
-  for (let index = start; index <= end; index++) {
-    const slot = Math.floor((frames[index].timestamp - frames[start].timestamp) / interval);
-
-    if (slot > lastSlot) {
-      result.push(index);
-      lastSlot = slot;
-    }
-  }
-
-  return result;
-}
+import { createFrameExtractor, selectFrames } from "../pipeline";
+import { outputSize } from "../settings";
 
 interface RenderViewAttrs {
   readonly app: App;
@@ -56,7 +30,7 @@ export default class RenderView implements m.ClassComponent<RenderViewAttrs> {
     this.height = size.height;
   }
 
-  async oncreate(vnode: m.VnodeDOM<RenderViewAttrs, this>) {
+  async oncreate() {
     const gif = new GifEncoder({
       width: this.width,
       height: this.height,
@@ -79,10 +53,7 @@ export default class RenderView implements m.ClassComponent<RenderViewAttrs> {
       this.app.finishRendering({ blob, url, duration, size: blob.size, width: this.width, height: this.height });
     });
 
-    const canvases = vnode.dom.getElementsByTagName("canvas");
-    const ctx = canvases[0].getContext("2d", { willReadFrequently: true }) as CanvasRenderingContext2D;
-    const scaledCtx = canvases[1].getContext("2d", { willReadFrequently: true }) as CanvasRenderingContext2D;
-    scaledCtx.imageSmoothingQuality = "high";
+    const extractFrame = createFrameExtractor(this.recording, this.renderOptions);
 
     const frames = this.recording.frames;
     const indexes = selectFrames(
@@ -101,35 +72,7 @@ export default class RenderView implements m.ClassComponent<RenderViewAttrs> {
       }
 
       const frame = frames[indexes[i]];
-      let imageData = frame.imageData;
-
-      // we always copy the imagedata, because the user might want to
-      // go back to edit, and we can't afford to lose frames which
-      // were moved to web workers
-      ctx.putImageData(imageData, 0, 0);
-
-      if (this.renderOptions.scale === 1) {
-        imageData = ctx.getImageData(
-          this.renderOptions.crop.left,
-          this.renderOptions.crop.top,
-          this.renderOptions.crop.width,
-          this.renderOptions.crop.height
-        );
-      } else {
-        // putImageData ignores transforms, so scale by drawing onto a second canvas
-        scaledCtx.drawImage(
-          canvases[0],
-          this.renderOptions.crop.left,
-          this.renderOptions.crop.top,
-          this.renderOptions.crop.width,
-          this.renderOptions.crop.height,
-          0,
-          0,
-          this.width,
-          this.height
-        );
-        imageData = scaledCtx.getImageData(0, 0, this.width, this.height);
-      }
+      const imageData = extractFrame(frame);
 
       // each kept frame lasts until the next kept one; the last lasts until the end of the trim range
       const delay = (i < indexes.length - 1 ? frames[indexes[i + 1]].timestamp : endTimestamp) - frame.timestamp;
@@ -156,11 +99,6 @@ export default class RenderView implements m.ClassComponent<RenderViewAttrs> {
           { max: "1", value: this.progress, title: "Rendering..." },
           `Rendering: ${Math.floor(this.progress * 100)}%`
         ),
-        m("canvas.hidden", {
-          width: this.recording.width,
-          height: this.recording.height
-        }),
-        m("canvas.hidden", { width: this.width, height: this.height }),
       ]),
     ];
   }

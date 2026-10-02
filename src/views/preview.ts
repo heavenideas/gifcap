@@ -2,7 +2,25 @@ import m from "mithril";
 import { App, Frame, Recording, Rect, Range, RenderOptions, RenderSettings } from "../gifcap";
 import Button from "../components/button";
 import View from "../components/view";
-import { MAX_SCALE_PERCENT, MIN_SCALE_PERCENT, outputSize, renderSettingsFrom, SETTINGS } from "../settings";
+import { Estimate, estimateSize, EstimateToken } from "../estimate";
+import { humanSize } from "../format";
+import {
+  DEFAULT_RENDER_SETTINGS,
+  MAX_SCALE_PERCENT,
+  MIN_SCALE_PERCENT,
+  outputSize,
+  renderSettingsFrom,
+  SETTINGS,
+} from "../settings";
+
+// wait this long after the last change before estimating the file size
+const ESTIMATE_DELAY = 500;
+
+function isDefault(settings: RenderSettings): boolean {
+  return (Object.keys(DEFAULT_RENDER_SETTINGS) as (keyof RenderSettings)[]).every(
+    (key) => settings[key] === DEFAULT_RENDER_SETTINGS[key]
+  );
+}
 
 function formatPercent(scale: number): string {
   return String(Math.round(scale * 10000) / 100);
@@ -79,6 +97,13 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
   private settings: RenderSettings;
   private scaleText: string; // what's in the size box, which may be mid-edit or invalid
 
+  private estimate: Estimate | undefined;
+  private estimating = false;
+  private baseline: Estimate | undefined; // same trim and crop at default settings, for the saving
+  private baselineKey = "";
+  private estimateToken: EstimateToken | undefined;
+  private estimateTimeout: number | undefined;
+
   private didDraw = false;
   private didResize = false;
 
@@ -128,6 +153,7 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
     this.zoomToFit();
 
     setTimeout(() => this.play());
+    this.scheduleEstimate();
   }
 
   private zoomToFit() {
@@ -157,6 +183,8 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
   onbeforeremove() {
     this.pause();
     this.viewportDisposable();
+    clearTimeout(this.estimateTimeout);
+    this.estimateToken && this.estimateToken.cancel();
   }
 
   view() {
@@ -204,12 +232,23 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
             title: setting.title,
             onchange: (e: Event) => {
               this.settings = { ...this.settings, [setting.name]: Number((e.target as HTMLSelectElement).value) };
+              this.scheduleEstimate();
             },
           },
           setting.options.map((option) =>
             m("option", { value: option.value, selected: option.value === this.settings[setting.name] }, option.label)
           )
         )
+      ),
+      m(
+        "span.estimate",
+        {
+          title:
+            "Estimated GIF file size" +
+            (this.estimate && !this.estimate.exact ? ", from a sample of frames" : "") +
+            ". The percentage is the saving versus 100% size, 12 FPS, 256 colors and Normal compression.",
+        },
+        this.estimateLabel()
       ),
       m(Button, {
         label: "Render",
@@ -287,8 +326,60 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
   private onScaleInput(text: string): void {
     this.scaleText = text;
 
-    if (this.isScaleTextValid()) {
+    if (this.isScaleTextValid() && Number(text) / 100 !== this.settings.scale) {
       this.settings = { ...this.settings, scale: Number(text) / 100 };
+      this.scheduleEstimate();
+    }
+  }
+
+  private estimateLabel(): string {
+    if (this.estimating || !this.estimate) {
+      return "Estimating size…";
+    }
+
+    const size = `${this.estimate.exact ? "" : "≈ "}${humanSize(this.estimate.bytes)}`;
+    const saving = this.baseline ? Math.round((1 - this.estimate.bytes / this.baseline.bytes) * 100) : 0;
+    return saving >= 1 && !isDefault(this.settings) ? `${size} (−${saving}%)` : size;
+  }
+
+  // (re)starts the file size estimate shortly after the last change, cancelling any in progress
+  private scheduleEstimate(): void {
+    clearTimeout(this.estimateTimeout);
+    this.estimateToken && this.estimateToken.cancel();
+    this.estimating = true;
+    this.estimateTimeout = window.setTimeout(() => this.runEstimate(), ESTIMATE_DELAY);
+  }
+
+  private async runEstimate(): Promise<void> {
+    const token = new EstimateToken();
+    this.estimateToken = token;
+
+    const options = this.renderOptions(this.settings);
+    const estimate = await estimateSize(this.recording, options, this.app.frameLength, token);
+
+    if (!estimate || token.cancelled) {
+      return;
+    }
+
+    this.estimate = estimate;
+    this.estimating = false;
+    m.redraw();
+
+    const baselineKey = JSON.stringify([options.trim, options.crop]);
+
+    if (baselineKey !== this.baselineKey) {
+      this.baseline = undefined;
+      const baseline = isDefault(this.settings)
+        ? estimate
+        : await estimateSize(this.recording, this.renderOptions(DEFAULT_RENDER_SETTINGS), this.app.frameLength, token);
+
+      if (!baseline || token.cancelled) {
+        return;
+      }
+
+      this.baseline = baseline;
+      this.baselineKey = baselineKey;
+      m.redraw();
     }
   }
 
@@ -330,6 +421,7 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
         this.playback.head = Math.max(this.playback.start, Math.min(this.playback.end, head));
       }
 
+      this.scheduleEstimate();
       m.redraw();
     };
 
@@ -413,6 +505,7 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
         this.crop.height = this.recording.height;
       }
 
+      this.scheduleEstimate();
       m.redraw();
     };
 
@@ -546,14 +639,18 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
     }
   }
 
-  private startRendering(): void {
-    this.app.startRendering({
-      ...this.settings,
+  private renderOptions(settings: RenderSettings): RenderOptions {
+    return {
+      ...settings,
       trim: {
         start: getFrameIndex(this.recording.frames, this.trim.start),
         end: getFrameIndex(this.recording.frames, this.trim.end),
       },
-      crop: this.crop,
-    });
+      crop: { ...this.crop },
+    };
+  }
+
+  private startRendering(): void {
+    this.app.startRendering(this.renderOptions(this.settings));
   }
 }
