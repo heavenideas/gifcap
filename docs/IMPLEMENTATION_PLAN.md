@@ -317,3 +317,4 @@ Append one line per work session: date, milestone, what was done, anything left 
 | 2026-10-02 | M7 | Owner verified locally with a real `.mov` and GIF. Merged to `main`. |
 | 2026-10-02 | M8 | Free size percentage (F3) and live output dimensions (F2). F1 (live file-size estimate) assessed, not built yet. |
 | 2026-10-02 | M9 | Live file-size estimate (F1) built and measured (see M9). F2/F3 merged to `main`. Note: Vercel deploys from `heavenideas/heavengif`, a one-time copy of this repo, not from this repo. |
+| 2026-10-02 | M6 | Vercel project reconnected to `heavenideas/gifcap` (Settings → Git); pushes to `main` deploy production. `heavenideas/heavengif` (Vercel's one-time copy, synced once at `d5a2f67`) is no longer used. |
