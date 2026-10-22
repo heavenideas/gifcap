@@ -294,15 +294,32 @@ user changes size, FPS, colours, compression, crop or trim, without rendering.
       gaps. One `outputFrames()` in `src/pipeline.ts` now decides the frames and delays (trim, cuts,
       FPS) for both render and estimate; `npm test` checks it. Output without cuts/overlays is
       byte-identical to before.
-- [x] Text and drawing overlays (`Overlay` in `src/gifcap.d.ts`, recording pixels): tool row over
-      the canvas (Crop / Text / Draw, 6 colours, S/M/L, and for the selected item: text field,
-      undo stroke, show from here, hide from here, delete). Click to add text, drag to move;
+- [x] Text and drawing overlays (`Overlay` in `src/gifcap.d.ts`, recording pixels): tool row
+      (Crop / Text / Draw, 6 colours, S/M/L, and for the selected item: text field, undo stroke,
+      delete; see M11 for the current layout). Click to add text, drag to move;
       strokes drawn in one go form one drawing. Each item is visible from where it was added to
       the end; bars under the timeline show when (click to select). Drawn by `drawOverlays()` in
       the preview and after scaling in the render, so they stay sharp and the estimate counts them.
 - [x] Verified headless: 1 s cut → 2.00 s GIF, 24 frames, survives Edit, restore brings back
       3.00 s; text + drawing hidden from 1.5 s show in early frames and only the text later.
 - [ ] Owner: try on real recordings.
+
+## M11: Editor layout redesign
+
+- [x] Four areas instead of one crammed bar: tool bar on top (Crop / Text / Draw with labels, a
+      one-line hint for the active tool, colours and size only for Text/Draw, and text field / undo /
+      delete for the selected item); the picture; an Output panel on the right (Size, Frame rate,
+      Colors, Compression, file-size estimate, Render, Discard; it moves under the picture on narrow
+      screens); and a timeline at the bottom (play, time, Cut, the Clip track with trim handles and
+      striped cut sections, and one labelled row per text/drawing).
+- [x] When a text or drawing shows is set by dragging the ends of its timeline bar (replaces the
+      show/hide-from-here buttons); the preview follows the handle.
+- [x] Layout never moves the picture: the rows area has a fixed height (scrolls past three), the
+      tool hint truncates instead of wrapping, and the canvas follows its own size via
+      `ResizeObserver`. Mouse positions are now measured from the canvas (they assumed it started
+      at the page's top left, which the new tool bar broke).
+- [x] Verified headless: tools don't move the picture; text drag moves the text; lane end drag to
+      1.5 s hides the drawing from then on; cuts/restore and renders unchanged.
 
 ## Non-goals (don't build unless a new milestone is added)
 
@@ -337,3 +354,4 @@ Append one line per work session: date, milestone, what was done, anything left 
 | 2026-10-02 | M9 | Live file-size estimate (F1) built and measured (see M9). F2/F3 merged to `main`. Note: Vercel deploys from `heavenideas/heavengif`, a one-time copy of this repo, not from this repo. |
 | 2026-10-02 | M6 | Vercel project reconnected to `heavenideas/gifcap` (Settings → Git); pushes to `main` deploy production. `heavenideas/heavengif` (Vercel's one-time copy, synced once at `d5a2f67`) is no longer used. |
 | 2026-10-22 | M10 | Cuts, text and drawing with visibility (see M10). |
+| 2026-10-22 | M11 | Editor layout redesign (see M11). |

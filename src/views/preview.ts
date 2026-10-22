@@ -1,7 +1,7 @@
 import m from "mithril";
 import { App, Frame, Overlay, Recording, Rect, Range, RenderOptions, RenderSettings } from "../gifcap";
 import Button from "../components/button";
-import View from "../components/view";
+import Icon from "../components/icon";
 import { Estimate, estimateSize, EstimateToken } from "../estimate";
 import { humanSize } from "../format";
 import { drawOverlays, outputFrames, overlayFont } from "../pipeline";
@@ -71,7 +71,7 @@ function drag(onMove: (event: MouseEvent) => void, onUp: () => void): void {
 
 function isDefault(settings: RenderSettings): boolean {
   return (Object.keys(DEFAULT_RENDER_SETTINGS) as (keyof RenderSettings)[]).every(
-    (key) => settings[key] === DEFAULT_RENDER_SETTINGS[key]
+    (key) => settings[key] === DEFAULT_RENDER_SETTINGS[key],
   );
 }
 
@@ -209,9 +209,10 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
     this.playbar = vnode.dom.querySelector(".playbar")!;
     this.content = vnode.dom.querySelector(".content")!;
 
-    const viewportListener = () => this.onDidResize();
-    window.addEventListener("resize", viewportListener);
-    this.viewportDisposable = () => window.removeEventListener("resize", viewportListener);
+    // the picture area also resizes when timeline rows or tool controls come and go
+    const observer = new ResizeObserver(() => this.onDidResize());
+    observer.observe(this.content);
+    this.viewportDisposable = () => observer.disconnect();
     this.onDidResize();
     this.zoomToFit();
 
@@ -227,8 +228,8 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
       Math.min(
         1,
         (this.viewport.width * dpr * 0.95) / this.recording.width,
-        (this.viewport.height * dpr * 0.95) / this.recording.height
-      )
+        (this.viewport.height * dpr * 0.95) / this.recording.height,
+      ),
     );
   }
 
@@ -251,120 +252,15 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
   }
 
   view() {
-    const percent = (t: number) => `${(t * 100) / this.duration}%`;
-    const actions = [
-      m(Button, {
-        title: this.isPlaying ? "Pause" : "Play",
-        iconset: "material",
-        icon: this.isPlaying ? "pause" : "play",
-        primary: true,
-        onclick: () => this.togglePlayPause(),
-      }),
-      m(".playbar", [
-        m("input", {
-          type: "range",
-          min: 0,
-          max: `${this.duration}`,
-          value: `${this.playback.head}`,
-          disabled: this.isPlaying,
-          oninput: (e: InputEvent) => this.onPlaybarInput(e),
-        }),
-        m(
-          ".trim-bar",
-          {
-            style: {
-              left: `${(this.trim.start * 100) / this.duration}%`,
-              width: `${((this.trim.end - this.trim.start) * 100) / this.duration}%`,
-            },
-          },
-          [
-            m(".trim-start", {
-              onmousedown: (e: MouseEvent) => this.onTrimMouseDown("start", e),
-            }),
-            m(".trim-end", {
-              onmousedown: (e: MouseEvent) => this.onTrimMouseDown("end", e),
-            }),
-          ]
-        ),
-        this.cuts.map((cut) =>
-          m(".cut", {
-            style: { left: percent(cut.start), width: percent(cut.end - cut.start) },
-            title: "Cut out; click to restore",
-            onclick: () => this.setCuts(this.cuts.filter((c) => c !== cut)),
-          })
-        ),
-        this.cutStart !== undefined && m(".cut-start", { style: { left: percent(this.cutStart) } }),
-        this.overlays.map((overlay, i) =>
-          m(".overlay-bar", {
-            class: overlay === this.selected ? "selected" : "",
-            style: {
-              left: percent(overlay.from),
-              width: percent(overlay.to - overlay.from),
-              top: `calc(50% + ${12 + i * 6}px)`,
-              background: overlay.color,
-            },
-            title: `${overlay.text ?? "Drawing"}: shown in this part; click to select`,
-            onclick: () => this.select(overlay),
-          })
-        ),
-      ]),
-      m(Button, {
-        label: this.cutStart === undefined ? "Cut from here" : "Cut to here",
-        icon: "",
-        title: "Remove a section: click at its start, move to its end, click again",
-        onclick: () => this.cut(),
-      }),
-      this.sizeSetting(),
-      ...SETTINGS.map((setting) =>
-        m(
-          "select.render-setting",
-          {
-            name: setting.name,
-            title: setting.title,
-            onchange: (e: Event) => {
-              this.settings = { ...this.settings, [setting.name]: Number((e.target as HTMLSelectElement).value) };
-              this.scheduleEstimate();
-            },
-          },
-          setting.options.map((option) =>
-            m("option", { value: option.value, selected: option.value === this.settings[setting.name] }, option.label)
-          )
-        )
-      ),
+    return m("section.view.editor", [
+      m(".tools", this.tools()),
       m(
-        "span.estimate",
+        "section.content.crop",
         {
-          title:
-            "Estimated GIF file size" +
-            (this.estimate && !this.estimate.exact ? ", from a sample of frames" : "") +
-            ". The percentage is the saving versus 100% size, 12 FPS, 256 colors and Normal compression.",
-        },
-        this.estimateLabel()
-      ),
-      m(Button, {
-        label: "Render",
-        icon: "gear",
-        onclick: () => this.startRendering(),
-        primary: true,
-      }),
-      m(Button, {
-        title: "Discard",
-        icon: "trashcan",
-        onclick: () => this.app.discardGif(),
-      }),
-    ];
-
-    return [
-      m(
-        View,
-        {
-          actions,
-          contentClass: "crop",
-          contentProps: {
-            onmousemove: (e: MouseEvent) => this.onMouseMove(e),
-            onmousedown: (e: MouseEvent) => this.onMouseDown(e),
-            oncontextmenu: (e: MouseEvent) => e.preventDefault(),
-          },
+          class: `tool-${this.tool}`,
+          onmousemove: (e: MouseEvent) => this.onMouseMove(e),
+          onmousedown: (e: MouseEvent) => this.onMouseDown(e),
+          oncontextmenu: (e: MouseEvent) => e.preventDefault(),
         },
         [
           m("canvas", {
@@ -378,15 +274,180 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
             height: Math.floor(this.viewport.height * dpr),
             onwheel: (e: WheelEvent) => this.onContentWheel(e),
           }),
-          m(".tools", { onmousedown: (e: MouseEvent) => e.stopPropagation() }, this.tools()),
-        ]
+        ],
+      ),
+      m("aside.output", this.output()),
+      m(".timeline", this.timeline()),
+    ]);
+  }
+
+  private timeline(): m.Children {
+    const percent = (t: number) => `${(t * 100) / this.duration}%`;
+    const seconds = (t: number) => `${(t / 1000).toFixed(1)} s`;
+
+    return [
+      m(".timeline-controls", [
+        m(Button, {
+          title: this.isPlaying ? "Pause" : "Play",
+          iconset: "material",
+          icon: this.isPlaying ? "pause" : "play",
+          primary: true,
+          onclick: () => this.togglePlayPause(),
+        }),
+        m("span.time", `${seconds(this.playback.head)} / ${seconds(this.duration)}`),
+        m(Button, {
+          label: this.cutStart === undefined ? "Cut from here" : "Cut to here",
+          icon: "",
+          title: "Remove a section: click at its start, move to its end, click again",
+          onclick: () => this.cut(),
+        }),
+        m(
+          "span.hint",
+          this.cutStart === undefined
+            ? "Drag the red handles to trim. Click a striped section to restore it."
+            : "Now move to where the cut should end and click Cut to here (or click again here to cancel).",
+        ),
+      ]),
+      m(".track", [
+        m("span.track-label", "Clip"),
+        m(".playbar", [
+          m("input", {
+            type: "range",
+            min: 0,
+            max: `${this.duration}`,
+            value: `${this.playback.head}`,
+            disabled: this.isPlaying,
+            oninput: (e: InputEvent) => this.onPlaybarInput(e),
+          }),
+          m(
+            ".trim-bar",
+            { style: { left: percent(this.trim.start), width: percent(this.trim.end - this.trim.start) } },
+            [
+              m(".trim-start", { onmousedown: (e: MouseEvent) => this.onTrimMouseDown("start", e) }),
+              m(".trim-end", { onmousedown: (e: MouseEvent) => this.onTrimMouseDown("end", e) }),
+            ],
+          ),
+          this.cuts.map((cut) =>
+            m(".cut", {
+              style: { left: percent(cut.start), width: percent(cut.end - cut.start) },
+              title: "Cut out; click to restore",
+              onclick: () => this.setCuts(this.cuts.filter((c) => c !== cut)),
+            }),
+          ),
+          this.cutStart !== undefined && m(".cut-start", { style: { left: percent(this.cutStart) } }),
+        ]),
+      ]),
+      m(
+        ".lanes",
+        this.overlays.length === 0
+          ? m("p.hint", "Text and drawings you add get a row here: drag the ends of their bar to set when they show.")
+          : this.overlays.map((overlay) =>
+              m(".track", { class: overlay === this.selected ? "selected" : "" }, [
+                m("button.track-label", { title: "Select", onclick: () => this.select(overlay) }, [
+                  m(Icon, {
+                    name: overlay.text !== undefined ? "octicons/typography" : "octicons/paintbrush",
+                    size: 14,
+                    color: "#333333",
+                  }),
+                  overlay.text ?? "Drawing",
+                ]),
+                m(".lane", [
+                  m(
+                    ".lane-bar",
+                    {
+                      style: {
+                        left: percent(overlay.from),
+                        width: percent(overlay.to - overlay.from),
+                        background: overlay.color,
+                      },
+                      title: "Shown during this part; drag the ends to change",
+                      onmousedown: (e: MouseEvent) => {
+                        e.preventDefault();
+                        this.select(overlay);
+                      },
+                    },
+                    [
+                      m(".lane-start", { onmousedown: (e: MouseEvent) => this.onLaneMouseDown(overlay, "from", e) }),
+                      m(".lane-end", { onmousedown: (e: MouseEvent) => this.onLaneMouseDown(overlay, "to", e) }),
+                    ],
+                  ),
+                  m(".playhead", { style: { left: percent(this.playback.head) } }),
+                ]),
+              ]),
+            ),
       ),
     ];
   }
 
+  private output(): m.Children {
+    return [
+      m("h4", "Output"),
+      this.sizeSetting(),
+      SETTINGS.map((setting) =>
+        m("label.field", { title: setting.title }, [
+          setting.label,
+          m(
+            "select",
+            {
+              name: setting.name,
+              onchange: (e: Event) => {
+                this.settings = { ...this.settings, [setting.name]: Number((e.target as HTMLSelectElement).value) };
+                this.scheduleEstimate();
+              },
+            },
+            setting.options.map((option) =>
+              m(
+                "option",
+                { value: option.value, selected: option.value === this.settings[setting.name] },
+                option.label,
+              ),
+            ),
+          ),
+        ]),
+      ),
+      m(
+        ".field",
+        {
+          title:
+            "Estimated GIF file size" +
+            (this.estimate && !this.estimate.exact ? ", from a sample of frames" : "") +
+            ". The percentage is the saving versus 100% size, 12 FPS, 256 colors and Normal compression.",
+        },
+        ["File size", m("span.estimate", this.estimateLabel())],
+      ),
+      m(Button, { label: "Render", icon: "gear", onclick: () => this.startRendering(), primary: true }),
+      m(Button, { label: "Discard", icon: "trashcan", onclick: () => this.app.discardGif() }),
+    ];
+  }
+
+  // drags when a text or drawing starts or stops showing, previewing that moment
+  private onLaneMouseDown(overlay: Overlay, edge: "from" | "to", event: MouseEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.pause();
+    this.select(overlay);
+
+    const width = this.playbar.clientWidth;
+    const startX = event.screenX;
+    const start = overlay[edge];
+
+    drag(
+      (e) => {
+        const t = start + ((e.screenX - startX) * this.duration) / width;
+        overlay[edge] =
+          edge === "from"
+            ? Math.max(0, Math.min(overlay.to - this.app.frameLength, t))
+            : Math.max(overlay.from + this.app.frameLength, Math.min(this.duration, t));
+        this.playback.head = edge === "from" ? overlay.from : overlay.to - 1;
+        m.redraw();
+      },
+      () => this.scheduleEstimate(),
+    );
+  }
+
   private tools(): m.Children {
-    const toolButton = (tool: Tool, icon: string, title: string) =>
-      m(Button, { icon, title, primary: this.tool === tool, onclick: () => this.setTool(tool) });
+    const toolButton = (tool: Tool, icon: string, label: string) =>
+      m(Button, { icon, label, primary: this.tool === tool, onclick: () => this.setTool(tool) });
     const selected = this.selected;
     const focus = (vnode: m.VnodeDOM) => {
       if (this.focusText) {
@@ -395,37 +456,47 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
         (vnode.dom as HTMLInputElement).select();
       }
     };
+    const hints = {
+      crop: "Drag over the picture to crop. Scroll to zoom, right-drag to pan.",
+      text: "Click to add text, drag text to move it.",
+      draw: "Drag to draw. Strokes made one after another form one drawing.",
+    };
 
     return [
-      toolButton("crop", "screen-full", "Crop: drag over the area to keep"),
-      toolButton("text", "typography", "Text: click to add, drag to move"),
+      toolButton("crop", "screen-full", "Crop"),
+      toolButton("text", "typography", "Text"),
       toolButton("draw", "paintbrush", "Draw"),
-      COLORS.map((color) =>
-        m("button.swatch", {
-          class: color === this.color ? "active" : "",
-          style: { background: color },
-          title: "Text and brush color",
-          onclick: () => this.setColor(color),
-        })
-      ),
-      m(
-        "select",
-        { title: "Text and brush size", onchange: (e: Event) => this.setSize(Number((e.target as HTMLSelectElement).value)) },
-        ["Small", "Medium", "Large"].map((label, i) => m("option", { value: i, selected: i === this.sizeIndex }, label))
-      ),
-      selected && [
-        selected.text !== undefined &&
-          m("input.overlay-text", {
-            value: selected.text,
-            oncreate: focus,
-            onupdate: focus,
-            oninput: (e: InputEvent) => this.changed(() => (selected.text = (e.target as HTMLInputElement).value)),
+      this.tool !== "crop" && [
+        COLORS.map((color) =>
+          m("button.swatch", {
+            class: color === this.color ? "active" : "",
+            style: { background: color },
+            title: "Color",
+            onclick: () => this.setColor(color),
           }),
-        selected.strokes && m(Button, { icon: "undo", title: "Undo last stroke", onclick: () => this.undoStroke() }),
-        m(Button, { icon: "eye", title: "Show from here", onclick: () => this.setVisibility("from") }),
-        m(Button, { icon: "eye-closed", title: "Hide from here", onclick: () => this.setVisibility("to") }),
-        m(Button, { icon: "x", title: "Delete", onclick: () => this.removeOverlay(selected) }),
+        ),
+        m(
+          "select",
+          { title: "Size", onchange: (e: Event) => this.setSize(Number((e.target as HTMLSelectElement).value)) },
+          ["Small", "Medium", "Large"].map((label, i) =>
+            m("option", { value: i, selected: i === this.sizeIndex }, label),
+          ),
+        ),
       ],
+      selected &&
+        selected.text !== undefined &&
+        m("input.overlay-text", {
+          style: { width: "14em" }, // chota's input rules outrank class selectors
+          value: selected.text,
+          oncreate: focus,
+          onupdate: focus,
+          oninput: (e: InputEvent) => this.changed(() => (selected.text = (e.target as HTMLInputElement).value)),
+        }),
+      selected &&
+        selected.strokes &&
+        m(Button, { icon: "undo", title: "Undo last stroke", onclick: () => this.undoStroke() }),
+      selected && m(Button, { icon: "x", title: "Delete", onclick: () => this.removeOverlay(selected) }),
+      m("span.hint", hints[this.tool]),
     ];
   }
 
@@ -464,15 +535,6 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
     this.sizeIndex = index;
     const selected = this.selected;
     selected && this.changed(() => (selected.size = this.overlaySize(selected.text !== undefined)));
-  }
-
-  private setVisibility(edge: "from" | "to"): void {
-    const selected = this.selected!;
-    const head = this.playback.head;
-
-    if (edge === "from" ? head < selected.to : head > selected.from) {
-      this.changed(() => (selected[edge] = head));
-    }
   }
 
   private undoStroke(): void {
@@ -520,14 +582,13 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
   private sizeSetting(): m.Children {
     const size = outputSize(this.crop, this.settings.scale);
 
-    return m(
-      "label.render-setting.size-setting",
-      { title: "Output size as a percentage of the cropped area; keeps the aspect ratio" },
-      [
-        "Size",
+    return m("label.field", { title: "Output size as a percentage of the cropped area; keeps the aspect ratio" }, [
+      "Size",
+      m(".size-input", [
         m("input", {
           type: "number",
           name: "scale",
+          style: { width: "6em" }, // chota's input rules outrank class selectors
           min: MIN_SCALE_PERCENT,
           max: MAX_SCALE_PERCENT,
           step: 1,
@@ -538,8 +599,8 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
         }),
         "%",
         m("span.output-size", `${size.width} × ${size.height}`),
-      ]
-    );
+      ]),
+    ]);
   }
 
   private isScaleTextValid(): boolean {
@@ -666,7 +727,7 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
 
   private setScale(
     scale: number,
-    reference: Point = { x: this.viewport.width / 2, y: this.viewport.height / 2 }
+    reference: Point = { x: this.viewport.width / 2, y: this.viewport.height / 2 },
   ): void {
     scale = Math.max(0.2, Math.min(3, scale));
 
@@ -683,8 +744,9 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
   }
 
   private onMouseMove(event: MouseEvent) {
-    this.mouse.x = event.clientX;
-    this.mouse.y = event.clientY;
+    const rect = this.canvas.getBoundingClientRect();
+    this.mouse.x = event.clientX - rect.left;
+    this.mouse.y = event.clientY - rect.top;
   }
 
   private onMouseDown(event: MouseEvent) {
@@ -699,8 +761,14 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
     }
   }
 
+  // the canvas no longer starts at the page's top left, so measure from the canvas itself
+  private canvasPoint(event: MouseEvent): Point {
+    const rect = this.canvas.getBoundingClientRect();
+    return { x: (event.clientX - rect.left) * dpr, y: (event.clientY - rect.top) * dpr };
+  }
+
   private recordingPoint(event: MouseEvent): Point {
-    const p = this.matrix.inverse().transformPoint({ x: event.clientX * dpr, y: event.clientY * dpr });
+    const p = this.matrix.inverse().transformPoint(this.canvasPoint(event));
     return { x: p.x - this.viewport.left, y: p.y - this.viewport.top };
   }
 
@@ -749,7 +817,7 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
         overlay.y = origin.y + p.y - start.y;
         m.redraw();
       },
-      () => this.scheduleEstimate()
+      () => this.scheduleEstimate(),
     );
   }
 
@@ -762,7 +830,15 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
     let drawing = this.selected;
 
     if (!drawing || !drawing.strokes || !this.isVisible(drawing)) {
-      drawing = { strokes: [], color: this.color, size: this.overlaySize(false), x: 0, y: 0, from: this.playback.head, to: this.duration };
+      drawing = {
+        strokes: [],
+        color: this.color,
+        size: this.overlaySize(false),
+        x: 0,
+        y: 0,
+        from: this.playback.head,
+        to: this.duration,
+      };
       this.overlays.push(drawing);
       this.selected = drawing;
     }
@@ -776,14 +852,14 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
         stroke.push(q.x, q.y);
         m.redraw();
       },
-      () => this.scheduleEstimate()
+      () => this.scheduleEstimate(),
     );
   }
 
   private onCrop(event: MouseEvent) {
     const M = this.matrix.inverse();
     const point = (event: MouseEvent) => {
-      const p = M.transformPoint({ x: event.clientX * dpr, y: event.clientY * dpr });
+      const p = M.transformPoint(this.canvasPoint(event));
 
       return {
         x: Math.max(Math.min(Math.floor(p.x) - this.viewport.left, this.recording.width), 0),
@@ -829,7 +905,7 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
   private onViewportMove(event: MouseEvent) {
     const M = this.matrix.inverse();
     const point = (event: MouseEvent) => {
-      const p = M.transformPoint({ x: event.clientX * dpr, y: event.clientY * dpr });
+      const p = M.transformPoint(this.canvasPoint(event));
       return { x: Math.floor(p.x), y: Math.floor(p.y) };
     };
 
@@ -961,7 +1037,7 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
       this.ctx.lineTo(this.viewport.left + this.crop.left, this.viewport.top + this.crop.top + this.crop.height);
       this.ctx.lineTo(
         this.viewport.left + this.crop.left + this.crop.width,
-        this.viewport.top + this.crop.top + this.crop.height
+        this.viewport.top + this.crop.top + this.crop.height,
       );
       this.ctx.lineTo(this.viewport.left + this.crop.left + this.crop.width, this.viewport.top + this.crop.top);
       this.ctx.lineTo(this.viewport.left + this.crop.left, this.viewport.top + this.crop.top);

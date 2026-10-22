@@ -17,6 +17,7 @@ export interface SettingOption {
 
 export interface Setting {
   readonly name: keyof RenderSettings;
+  readonly label: string;
   readonly title: string;
   readonly options: SettingOption[];
 }
@@ -37,6 +38,7 @@ export function outputSize(crop: Rect, scale: number): { width: number; height: 
 export const SETTINGS: Setting[] = [
   {
     name: "fps",
+    label: "Frame rate",
     title: "Frames per second",
     options: [
       { value: CAPTURE_FPS, label: `${CAPTURE_FPS} FPS` },
@@ -47,6 +49,7 @@ export const SETTINGS: Setting[] = [
   },
   {
     name: "colors",
+    label: "Colors",
     title: "Maximum colors per frame",
     options: [
       { value: 256, label: "256 colors" },
@@ -57,11 +60,12 @@ export const SETTINGS: Setting[] = [
   },
   {
     name: "loss",
+    label: "Compression",
     title: "Lossy compression level: higher is smaller but noisier",
     options: [
-      { value: 20, label: "Compression: Normal" },
-      { value: 60, label: "Compression: High" },
-      { value: 120, label: "Compression: Max" },
+      { value: 20, label: "Normal" },
+      { value: 60, label: "High" },
+      { value: 120, label: "Max" },
     ],
   },
 ];
