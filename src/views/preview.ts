@@ -1,9 +1,10 @@
 import m from "mithril";
-import { App, Frame, Recording, Rect, Range, RenderOptions, RenderSettings } from "../gifcap";
+import { App, Frame, Overlay, Recording, Rect, Range, RenderOptions, RenderSettings } from "../gifcap";
 import Button from "../components/button";
 import View from "../components/view";
 import { Estimate, estimateSize, EstimateToken } from "../estimate";
 import { humanSize } from "../format";
+import { drawOverlays, outputFrames, overlayFont } from "../pipeline";
 import {
   DEFAULT_RENDER_SETTINGS,
   MAX_SCALE_PERCENT,
@@ -15,6 +16,58 @@ import {
 
 // wait this long after the last change before estimating the file size
 const ESTIMATE_DELAY = 500;
+
+const COLORS = ["#ffffff", "#000000", "#e53935", "#fdd835", "#43a047", "#1e88e5"];
+
+// small / medium / large, as a fraction of the recording height
+const TEXT_SIZES = [0.04, 0.07, 0.12];
+const BRUSH_SIZES = [0.006, 0.012, 0.024];
+
+type Tool = "crop" | "text" | "draw";
+
+// the parts of `range` not covered by `cuts`
+function keptSegments(range: Range, cuts: Range[]): Range[] {
+  let segments = [range];
+
+  for (const cut of cuts) {
+    segments = segments
+      .flatMap((s) => [
+        { start: s.start, end: Math.min(s.end, cut.start) },
+        { start: Math.max(s.start, cut.end), end: s.end },
+      ])
+      .filter((s) => s.end > s.start);
+  }
+
+  return segments;
+}
+
+function mergeCuts(cuts: Range[]): Range[] {
+  const merged: Range[] = [];
+
+  for (const cut of [...cuts].sort((a, b) => a.start - b.start)) {
+    const last = merged[merged.length - 1];
+
+    if (last && cut.start <= last.end) {
+      last.end = Math.max(last.end, cut.end);
+    } else {
+      merged.push({ ...cut });
+    }
+  }
+
+  return merged;
+}
+
+function drag(onMove: (event: MouseEvent) => void, onUp: () => void): void {
+  const up = () => {
+    document.body.removeEventListener("mousemove", onMove);
+    document.body.removeEventListener("mouseup", up);
+    onUp();
+    m.redraw();
+  };
+
+  document.body.addEventListener("mousemove", onMove);
+  document.body.addEventListener("mouseup", up);
+}
 
 function isDefault(settings: RenderSettings): boolean {
   return (Object.keys(DEFAULT_RENDER_SETTINGS) as (keyof RenderSettings)[]).every(
@@ -93,7 +146,15 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
   private initialScale!: number;
   private playback: Playback;
   private trim: Range;
+  private cuts: Range[]; // removed sections (ms), merged and sorted
+  private cutStart: number | undefined; // where a cut in progress starts (ms)
   private crop: Rect;
+  private overlays: Overlay[];
+  private selected: Overlay | undefined;
+  private tool: Tool = "crop";
+  private color = COLORS[0];
+  private sizeIndex = 1;
+  private focusText = false;
   private settings: RenderSettings;
   private scaleText: string; // what's in the size box, which may be mid-edit or invalid
 
@@ -129,6 +190,8 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
       width: this.recording.width,
       height: this.recording.height,
     };
+    this.cuts = vnode.attrs.renderOptions?.cuts ?? [];
+    this.overlays = vnode.attrs.renderOptions?.overlays ?? [];
     this.settings = renderSettingsFrom(vnode.attrs.renderOptions);
     this.scaleText = formatPercent(this.settings.scale);
   }
@@ -188,6 +251,7 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
   }
 
   view() {
+    const percent = (t: number) => `${(t * 100) / this.duration}%`;
     const actions = [
       m(Button, {
         title: this.isPlaying ? "Pause" : "Play",
@@ -222,7 +286,34 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
             }),
           ]
         ),
+        this.cuts.map((cut) =>
+          m(".cut", {
+            style: { left: percent(cut.start), width: percent(cut.end - cut.start) },
+            title: "Cut out; click to restore",
+            onclick: () => this.setCuts(this.cuts.filter((c) => c !== cut)),
+          })
+        ),
+        this.cutStart !== undefined && m(".cut-start", { style: { left: percent(this.cutStart) } }),
+        this.overlays.map((overlay, i) =>
+          m(".overlay-bar", {
+            class: overlay === this.selected ? "selected" : "",
+            style: {
+              left: percent(overlay.from),
+              width: percent(overlay.to - overlay.from),
+              top: `calc(50% + ${12 + i * 6}px)`,
+              background: overlay.color,
+            },
+            title: `${overlay.text ?? "Drawing"}: shown in this part; click to select`,
+            onclick: () => this.select(overlay),
+          })
+        ),
       ]),
+      m(Button, {
+        label: this.cutStart === undefined ? "Cut from here" : "Cut to here",
+        icon: "",
+        title: "Remove a section: click at its start, move to its end, click again",
+        onclick: () => this.cut(),
+      }),
       this.sizeSetting(),
       ...SETTINGS.map((setting) =>
         m(
@@ -287,9 +378,143 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
             height: Math.floor(this.viewport.height * dpr),
             onwheel: (e: WheelEvent) => this.onContentWheel(e),
           }),
+          m(".tools", { onmousedown: (e: MouseEvent) => e.stopPropagation() }, this.tools()),
         ]
       ),
     ];
+  }
+
+  private tools(): m.Children {
+    const toolButton = (tool: Tool, icon: string, title: string) =>
+      m(Button, { icon, title, primary: this.tool === tool, onclick: () => this.setTool(tool) });
+    const selected = this.selected;
+    const focus = (vnode: m.VnodeDOM) => {
+      if (this.focusText) {
+        this.focusText = false;
+        (vnode.dom as HTMLInputElement).focus();
+        (vnode.dom as HTMLInputElement).select();
+      }
+    };
+
+    return [
+      toolButton("crop", "screen-full", "Crop: drag over the area to keep"),
+      toolButton("text", "typography", "Text: click to add, drag to move"),
+      toolButton("draw", "paintbrush", "Draw"),
+      COLORS.map((color) =>
+        m("button.swatch", {
+          class: color === this.color ? "active" : "",
+          style: { background: color },
+          title: "Text and brush color",
+          onclick: () => this.setColor(color),
+        })
+      ),
+      m(
+        "select",
+        { title: "Text and brush size", onchange: (e: Event) => this.setSize(Number((e.target as HTMLSelectElement).value)) },
+        ["Small", "Medium", "Large"].map((label, i) => m("option", { value: i, selected: i === this.sizeIndex }, label))
+      ),
+      selected && [
+        selected.text !== undefined &&
+          m("input.overlay-text", {
+            value: selected.text,
+            oncreate: focus,
+            onupdate: focus,
+            oninput: (e: InputEvent) => this.changed(() => (selected.text = (e.target as HTMLInputElement).value)),
+          }),
+        selected.strokes && m(Button, { icon: "undo", title: "Undo last stroke", onclick: () => this.undoStroke() }),
+        m(Button, { icon: "eye", title: "Show from here", onclick: () => this.setVisibility("from") }),
+        m(Button, { icon: "eye-closed", title: "Hide from here", onclick: () => this.setVisibility("to") }),
+        m(Button, { icon: "x", title: "Delete", onclick: () => this.removeOverlay(selected) }),
+      ],
+    ];
+  }
+
+  // applies an edit to overlays, then updates the size estimate
+  private changed(edit: () => void): void {
+    edit();
+    this.scheduleEstimate();
+  }
+
+  private setTool(tool: Tool): void {
+    this.tool = tool;
+    this.selected = undefined; // the next text or drawing starts fresh
+  }
+
+  private select(overlay: Overlay): void {
+    this.selected = overlay;
+    this.tool = overlay.text !== undefined ? "text" : "draw";
+
+    if (this.playback.head < overlay.from || this.playback.head >= overlay.to) {
+      this.pause();
+      this.playback.head = overlay.from;
+    }
+  }
+
+  private overlaySize(text: boolean): number {
+    return Math.max(2, Math.round((text ? TEXT_SIZES : BRUSH_SIZES)[this.sizeIndex] * this.recording.height));
+  }
+
+  private setColor(color: string): void {
+    this.color = color;
+    const selected = this.selected;
+    selected && this.changed(() => (selected.color = color));
+  }
+
+  private setSize(index: number): void {
+    this.sizeIndex = index;
+    const selected = this.selected;
+    selected && this.changed(() => (selected.size = this.overlaySize(selected.text !== undefined)));
+  }
+
+  private setVisibility(edge: "from" | "to"): void {
+    const selected = this.selected!;
+    const head = this.playback.head;
+
+    if (edge === "from" ? head < selected.to : head > selected.from) {
+      this.changed(() => (selected[edge] = head));
+    }
+  }
+
+  private undoStroke(): void {
+    const selected = this.selected!;
+    this.changed(() => selected.strokes!.pop());
+
+    if (selected.strokes!.length === 0) {
+      this.removeOverlay(selected);
+    }
+  }
+
+  private removeOverlay(overlay: Overlay): void {
+    this.changed(() => (this.overlays = this.overlays.filter((o) => o !== overlay)));
+    this.selected = undefined;
+  }
+
+  private cut(): void {
+    const head = this.playback.head;
+
+    if (this.cutStart === undefined) {
+      this.cutStart = head;
+      return;
+    }
+
+    const cut = { start: Math.min(this.cutStart, head), end: Math.max(this.cutStart, head) };
+    const cuts = mergeCuts([...this.cuts, cut]);
+    this.cutStart = undefined;
+
+    // clicking twice in place cancels; never cut away everything
+    if (cut.end - cut.start >= this.app.frameLength && keptSegments(this.trim, cuts).length > 0) {
+      this.setCuts(cuts);
+    }
+  }
+
+  private setCuts(cuts: Range[]): void {
+    this.cuts = cuts;
+
+    if (this.isPlaying) {
+      this.play(); // pick up the new sections
+    }
+
+    this.scheduleEstimate();
   }
 
   private sizeSetting(): m.Children {
@@ -335,6 +560,8 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
   private estimateLabel(): string {
     if (this.estimating || !this.estimate) {
       return "Estimating size…";
+    } else if (this.estimate.bytes === 0) {
+      return "Nothing left to render";
     }
 
     const size = `${this.estimate.exact ? "" : "≈ "}${humanSize(this.estimate.bytes)}`;
@@ -365,7 +592,7 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
     this.estimating = false;
     m.redraw();
 
-    const baselineKey = JSON.stringify([options.trim, options.crop]);
+    const baselineKey = JSON.stringify([options.trim, options.cuts, options.crop, options.overlays]);
 
     if (baselineKey !== this.baselineKey) {
       this.baseline = undefined;
@@ -463,9 +690,94 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
   private onMouseDown(event: MouseEvent) {
     if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button > 0) {
       this.onViewportMove(event);
+    } else if (this.tool === "text") {
+      this.onText(event);
+    } else if (this.tool === "draw") {
+      this.onDraw(event);
     } else {
       this.onCrop(event);
     }
+  }
+
+  private recordingPoint(event: MouseEvent): Point {
+    const p = this.matrix.inverse().transformPoint({ x: event.clientX * dpr, y: event.clientY * dpr });
+    return { x: p.x - this.viewport.left, y: p.y - this.viewport.top };
+  }
+
+  private isVisible(overlay: Overlay): boolean {
+    return this.playback.head >= overlay.from && this.playback.head < overlay.to;
+  }
+
+  // click a visible text to select and drag it, or anywhere else to add one
+  private onText(event: MouseEvent) {
+    event.preventDefault();
+    this.pause();
+
+    const start = this.recordingPoint(event);
+    const hit = this.overlays.find((o) => {
+      if (o.text === undefined || !this.isVisible(o)) {
+        return false;
+      }
+
+      this.ctx.font = overlayFont(o.size);
+      const width = this.ctx.measureText(o.text).width;
+      return start.x >= o.x && start.x <= o.x + width && start.y >= o.y && start.y <= o.y + o.size;
+    });
+
+    const overlay = hit ?? {
+      text: "Text",
+      color: this.color,
+      size: this.overlaySize(true),
+      x: start.x,
+      y: start.y,
+      from: this.playback.head,
+      to: this.duration,
+    };
+
+    if (!hit) {
+      this.overlays.push(overlay);
+      this.focusText = true;
+    }
+
+    this.selected = overlay;
+    const origin = { x: overlay.x, y: overlay.y };
+
+    drag(
+      (e) => {
+        const p = this.recordingPoint(e);
+        overlay.x = origin.x + p.x - start.x;
+        overlay.y = origin.y + p.y - start.y;
+        m.redraw();
+      },
+      () => this.scheduleEstimate()
+    );
+  }
+
+  // strokes go into the selected drawing while it is visible, else into a new one
+  private onDraw(event: MouseEvent) {
+    event.preventDefault();
+    this.pause();
+
+    const p = this.recordingPoint(event);
+    let drawing = this.selected;
+
+    if (!drawing || !drawing.strokes || !this.isVisible(drawing)) {
+      drawing = { strokes: [], color: this.color, size: this.overlaySize(false), x: 0, y: 0, from: this.playback.head, to: this.duration };
+      this.overlays.push(drawing);
+      this.selected = drawing;
+    }
+
+    const stroke = [p.x, p.y];
+    drawing.strokes!.push(stroke);
+
+    drag(
+      (e) => {
+        const q = this.recordingPoint(e);
+        stroke.push(q.x, q.y);
+        m.redraw();
+      },
+      () => this.scheduleEstimate()
+    );
   }
 
   private onCrop(event: MouseEvent) {
@@ -555,15 +867,46 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
 
   play() {
     this.playback.disposable();
+    this.playback.disposable = noop;
+
+    // play only the parts that aren't cut: map between time played and recording time
+    const segments = keptSegments({ start: this.playback.start, end: this.playback.end }, this.cuts);
+    const total = segments.reduce((sum, s) => sum + s.end - s.start, 0);
+    const toPlayed = (t: number) => {
+      let played = 0;
+
+      for (const s of segments) {
+        if (t < s.end) {
+          return played + Math.max(0, t - s.start);
+        }
+
+        played += s.end - s.start;
+      }
+
+      return 0;
+    };
+    const fromPlayed = (played: number) => {
+      for (const s of segments) {
+        if (played < s.end - s.start) {
+          return s.start + played;
+        }
+
+        played -= s.end - s.start;
+      }
+
+      return segments[0].start;
+    };
+
+    if (total <= 0) {
+      return;
+    }
 
     let handle: number | undefined = undefined;
 
-    this.playback.head = Math.max(this.playback.start, Math.min(this.playback.end, this.playback.head));
-    this.playback.offset = Date.now() - this.playback.head + this.playback.start;
+    this.playback.offset = Date.now() - toPlayed(this.playback.head);
 
     const draw = () => {
-      this.playback.head =
-        this.playback.start + ((Date.now() - this.playback.offset) % (this.playback.end - this.playback.start));
+      this.playback.head = fromPlayed((Date.now() - this.playback.offset) % total);
 
       m.redraw();
       handle = requestAnimationFrame(draw);
@@ -596,6 +939,10 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
 
     this.ctx.setTransform(transform);
     this.ctx.drawImage(this.sourceCanvas, this.viewport.left, this.viewport.top);
+    this.ctx.save();
+    this.ctx.translate(this.viewport.left, this.viewport.top);
+    drawOverlays(this.ctx, this.overlays, this.recording.frames[index].timestamp);
+    this.ctx.restore();
 
     if (
       this.crop.top !== 0 ||
@@ -646,11 +993,20 @@ export default class PreviewView implements m.ClassComponent<PreviewViewAttrs> {
         start: getFrameIndex(this.recording.frames, this.trim.start),
         end: getFrameIndex(this.recording.frames, this.trim.end),
       },
+      cuts: this.cuts,
       crop: { ...this.crop },
+      overlays: [...this.overlays],
     };
   }
 
   private startRendering(): void {
-    this.app.startRendering(this.renderOptions(this.settings));
+    const options = this.renderOptions(this.settings);
+
+    if (outputFrames(this.recording.frames, options, this.app.frameLength).length === 0) {
+      window.alert("Everything is cut out; restore a section first.");
+      return;
+    }
+
+    this.app.startRendering(options);
   }
 }

@@ -1,5 +1,5 @@
 import { Recording, Rect, RenderOptions } from "./gifcap";
-import { createFrameExtractor, selectFrames } from "./pipeline";
+import { createFrameExtractor, OutputFrame, outputFrames } from "./pipeline";
 import { outputSize } from "./settings";
 
 // clips with up to this many output frames are encoded fully, giving the exact size
@@ -214,8 +214,7 @@ function sampleStarts(areas: number[]): number[] {
 async function encode(
   recording: Recording,
   options: RenderOptions,
-  indexes: number[],
-  frameLength: number,
+  frames: OutputFrame[],
   token: EstimateToken
 ): Promise<Uint8Array | undefined> {
   const size = outputSize(options.crop, options.scale);
@@ -224,16 +223,13 @@ async function encode(
   token.onCancel(() => gif.abort());
 
   const extractFrame = createFrameExtractor(recording, options);
-  const frames = recording.frames;
 
-  for (let i = 0; i < indexes.length; i++) {
+  for (const frame of frames) {
     if (token.cancelled) {
       return undefined;
     }
 
-    const frame = frames[indexes[i]];
-    const delay = (i < indexes.length - 1 ? frames[indexes[i + 1]].timestamp : frame.timestamp + frameLength) - frame.timestamp;
-    gif.addFrame(extractFrame(frame), delay);
+    gif.addFrame(extractFrame(recording.frames[frame.index]), frame.delay);
     await nextTick(); // keep the editor responsive
   }
 
@@ -250,10 +246,15 @@ export async function estimateSize(
   frameLength: number,
   token: EstimateToken
 ): Promise<Estimate | undefined> {
-  const indexes = selectFrames(recording.frames, options.trim.start, options.trim.end, options.fps);
+  const frames = outputFrames(recording.frames, options, frameLength);
+  const indexes = frames.map((frame) => frame.index);
+
+  if (frames.length === 0) {
+    return { bytes: 0, exact: true }; // everything is cut
+  }
 
   if (indexes.length <= EXACT_LIMIT) {
-    const bytes = await encode(recording, options, indexes, frameLength, token);
+    const bytes = await encode(recording, options, frames, token);
     return bytes && { bytes: bytes.length, exact: true };
   }
 
@@ -282,7 +283,7 @@ export async function estimateSize(
   let sampleArea = 0;
 
   for (let w = 0; w < starts.length; w++) {
-    const bytes = await encode(recording, options, indexes.slice(starts[w], starts[w] + WINDOW), frameLength, token);
+    const bytes = await encode(recording, options, frames.slice(starts[w], starts[w] + WINDOW), token);
 
     if (!bytes) {
       return undefined;

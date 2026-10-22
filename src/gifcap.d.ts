@@ -28,9 +28,23 @@ export interface RenderSettings {
   readonly loss: number;
 }
 
+// text or a drawing laid over the frames, in recording pixels
+export interface Overlay {
+  color: string;
+  size: number; // font size or brush width
+  x: number; // text: top left
+  y: number;
+  text?: string;
+  strokes?: number[][]; // drawing: [x0, y0, x1, y1, …] per stroke
+  from: number; // visible while from <= frame timestamp < to (ms)
+  to: number;
+}
+
 export interface RenderOptions extends RenderSettings {
-  readonly trim: Range;
+  readonly trim: Range; // frame indexes
+  readonly cuts: Range[]; // removed sections, as timestamps (ms): start <= t < end
   readonly crop: Rect;
+  readonly overlays: Overlay[];
 }
 
 export interface Gif {

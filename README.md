@@ -18,6 +18,7 @@ Record your screen into an animated GIF, all you need is a browser!
 - Entire screen recordings, or selection of single window;
 - Intuitive trimming UI
 - Easy cropping via visual drag-and-drop
+- Cut sections out of the middle; add text and simple drawings, each shown for the part you choose
 - Open a video or GIF from your computer and edit it the same way (read locally, never uploaded)
 - Output size (any percentage), frame rate, colour count and compression controls, with a live estimate of the GIF file size and the saving
 

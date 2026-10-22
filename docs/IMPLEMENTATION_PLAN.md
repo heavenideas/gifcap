@@ -287,11 +287,29 @@ user changes size, FPS, colours, compression, crop or trim, without rendering.
       thread task over 50 ms during an estimate.
 - [ ] Owner: check the estimate against real renders on real recordings.
 
+## M10: Cuts, text and drawing
+
+- [x] Cuts: "Cut from here" / "Cut to here" around the playhead removes a section; cut sections
+      show dark on the timeline (click to restore), playback skips them, and the GIF closes the
+      gaps. One `outputFrames()` in `src/pipeline.ts` now decides the frames and delays (trim, cuts,
+      FPS) for both render and estimate; `npm test` checks it. Output without cuts/overlays is
+      byte-identical to before.
+- [x] Text and drawing overlays (`Overlay` in `src/gifcap.d.ts`, recording pixels): tool row over
+      the canvas (Crop / Text / Draw, 6 colours, S/M/L, and for the selected item: text field,
+      undo stroke, show from here, hide from here, delete). Click to add text, drag to move;
+      strokes drawn in one go form one drawing. Each item is visible from where it was added to
+      the end; bars under the timeline show when (click to select). Drawn by `drawOverlays()` in
+      the preview and after scaling in the render, so they stay sharp and the estimate counts them.
+- [x] Verified headless: 1 s cut → 2.00 s GIF, 24 frames, survives Edit, restore brings back
+      3.00 s; text + drawing hidden from 1.5 s show in early frames and only the text later.
+- [ ] Owner: try on real recordings.
+
 ## Non-goals (don't build unless a new milestone is added)
 
 - Audio capture.
 - Downloading the original video (tried in M1, removed; see above).
 - Exporting the trimmed/cropped clip as video (WebCodecs/ffmpeg.wasm).
+- Touch/pen drawing (tools use mouse events like the rest of the editor), multi-line text, fonts.
 - FPS above 12 or changing capture-time resolution.
 - Named presets, remembered settings, live size estimates, side-by-side quality previews.
 - A "compression algorithm" selector. GIF only supports LZW; the real levers are M2–M4.
@@ -318,3 +336,4 @@ Append one line per work session: date, milestone, what was done, anything left 
 | 2026-10-02 | M8 | Free size percentage (F3) and live output dimensions (F2). F1 (live file-size estimate) assessed, not built yet. |
 | 2026-10-02 | M9 | Live file-size estimate (F1) built and measured (see M9). F2/F3 merged to `main`. Note: Vercel deploys from `heavenideas/heavengif`, a one-time copy of this repo, not from this repo. |
 | 2026-10-02 | M6 | Vercel project reconnected to `heavenideas/gifcap` (Settings → Git); pushes to `main` deploy production. `heavenideas/heavengif` (Vercel's one-time copy, synced once at `d5a2f67`) is no longer used. |
+| 2026-10-22 | M10 | Cuts, text and drawing with visibility (see M10). |

@@ -2,7 +2,7 @@ import m from "mithril";
 import { App, Recording, RenderOptions } from "../gifcap";
 import Button from "../components/button";
 import View from "../components/view";
-import { createFrameExtractor, selectFrames } from "../pipeline";
+import { createFrameExtractor, outputFrames } from "../pipeline";
 import { outputSize } from "../settings";
 
 interface RenderViewAttrs {
@@ -43,40 +43,25 @@ export default class RenderView implements m.ClassComponent<RenderViewAttrs> {
       m.redraw();
     });
 
+    const frames = outputFrames(this.recording.frames, this.renderOptions, this.app.frameLength);
+
     gif.once("finished", (blob) => {
       const url = URL.createObjectURL(blob);
-      const duration =
-        this.recording.frames[this.renderOptions.trim.end].timestamp -
-        this.recording.frames[this.renderOptions.trim.start].timestamp +
-        this.app.frameLength;
+      const duration = frames.reduce((sum, frame) => sum + frame.delay, 0);
 
       this.app.finishRendering({ blob, url, duration, size: blob.size, width: this.width, height: this.height });
     });
 
     const extractFrame = createFrameExtractor(this.recording, this.renderOptions);
 
-    const frames = this.recording.frames;
-    const indexes = selectFrames(
-      frames,
-      this.renderOptions.trim.start,
-      this.renderOptions.trim.end,
-      this.renderOptions.fps
-    );
-    const endTimestamp = frames[this.renderOptions.trim.end].timestamp + this.app.frameLength;
-
     const processFrame = (i: number) => {
-      if (i >= indexes.length) {
+      if (i >= frames.length) {
         this._onbeforeremove = () => gif.abort();
         gif.render();
         return;
       }
 
-      const frame = frames[indexes[i]];
-      const imageData = extractFrame(frame);
-
-      // each kept frame lasts until the next kept one; the last lasts until the end of the trim range
-      const delay = (i < indexes.length - 1 ? frames[indexes[i + 1]].timestamp : endTimestamp) - frame.timestamp;
-      gif.addFrame(imageData, delay);
+      gif.addFrame(extractFrame(this.recording.frames[frames[i].index]), frames[i].delay);
       setTimeout(() => processFrame(i + 1), 0);
     };
 

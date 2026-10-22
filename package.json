@@ -7,6 +7,7 @@
     "test": "test"
   },
   "scripts": {
+    "test": "node scripts/test-pipeline.js",
     "typecheck": "tsc --noEmit",
     "watch:typecheck": "npm run typecheck -- --watch",
     "dist": "esbuild src/main.ts --bundle --minify --sourcemap --target=chrome58,firefox57,safari11,edge16 --outfile=dist/main.js",
